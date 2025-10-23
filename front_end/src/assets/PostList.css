@@ -1,0 +1,136 @@
+/* Tổng thể danh sách bài viết */
+.post-list {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Segoe UI', sans-serif;
+    color: #222;
+}
+
+/* Bài viết */
+.post-card {
+    border: 1px solid #ddd;
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.post-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.post-card h4 {
+    margin: 0 0 8px 0;
+    font-size: 20px;
+}
+
+.post-card p {
+    margin: 0 0 12px 0;
+    line-height: 1.5;
+    font-size: 15px;
+}
+
+/* Media (ảnh, video) */
+.media-view {
+    display: grid;
+    gap: 10px;
+}
+
+.media-view img,
+.media-view video {
+    width: 100%;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
+/* Nút Like */
+.like-button {
+    background-color: #1877f2;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.like-button:hover {
+    background-color: #166fe5;
+}
+
+/* Bình luận */
+.comment-section {
+    margin-top: 16px;
+}
+
+.comment-section strong {
+    font-size: 16px;
+}
+
+.comment-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 8px;
+}
+
+.comment-list li {
+    padding: 6px 0;
+    border-bottom: 1px solid #eee;
+    font-size: 14px;
+}
+
+.comment-box {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.comment-box input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+
+.comment-box button {
+    background-color: #42b72a;
+    border: none;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.comment-box button:hover {
+    background-color: #36a420;
+}
+
+/* Phân trang */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.pagination button {
+    border: none;
+    background-color: #eee;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.pagination button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.pagination span {
+    font-weight: 500;
+}
