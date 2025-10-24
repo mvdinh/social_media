@@ -8,13 +8,16 @@ import { Route, Routes } from "react-router-dom";
 import Feed from "./pages/Feed";
 import Layout from "./pages/Layout";
 import CreateStoryModal from "./pages/CreateStory";
+import { LogIn } from "lucide-react";
+import Login from "./pages/Login/Login";
 
 function App() {
   return (
     <>
       <Routes>
+        <Route index element={<Login />} />
         <Route path="/" element={<Layout />}>
-          <Route index element={<Feed />} />
+          <Route path="feed"element={<Feed />} />
           {/* <Route path="messages" element={<Message />} />
           <Route path="messages/:userId" element={<ChatBox />} /> */}
           <Route path="connections" element={<Connection />} />

@@ -5,6 +5,7 @@ import { dummyMessagesData } from "../assets/assets";
 // Import dữ liệu mẫu
 
 // --- Component phụ: Message Bubble (Dùng cho Pop-up) ---
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const PopUpMessageBubble = ({ text, isSender }) => {
   // Giả định logic lọc tin nhắn
   const textToDisplay = text.trim() === "" ? "[Ảnh]" : text;
