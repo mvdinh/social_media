@@ -1,0 +1,136 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+contract PostSocial {
+    struct Post {
+        uint256 id;
+        address author;
+        string content;
+        string imageUrl;
+        uint256 timestamp;
+        uint256 likes;
+        uint256 shares;
+        uint256 commentCount;
+    }
+
+    struct Comment {
+        uint256 id;
+        uint256 postId;
+        address author;
+        string content;
+        uint256 timestamp;
+    }
+
+    uint256 private postCounter;
+    uint256 private commentCounter;
+
+    mapping(uint256 => Post) public posts;
+    mapping(uint256 => Comment[]) public postComments;
+    mapping(uint256 => mapping(address => bool)) public hasLiked;
+    mapping(uint256 => mapping(address => bool)) public hasShared;
+
+    event PostCreated(uint256 indexed postId, address indexed author, string content, uint256 timestamp);
+    event PostLiked(uint256 indexed postId, address indexed user, uint256 totalLikes);
+    event PostUnliked(uint256 indexed postId, address indexed user, uint256 totalLikes);
+    event PostShared(uint256 indexed postId, address indexed user, uint256 totalShares);
+    event CommentAdded(uint256 indexed postId, uint256 indexed commentId, address indexed author, string content);
+
+    function createPost(string memory _content, string memory _imageUrl) external {
+        postCounter++;
+        
+        posts[postCounter] = Post({
+            id: postCounter,
+            author: msg.sender,
+            content: _content,
+            imageUrl: _imageUrl,
+            timestamp: block.timestamp,
+            likes: 0,
+            shares: 0,
+            commentCount: 0
+        });
+
+        emit PostCreated(postCounter, msg.sender, _content, block.timestamp);
+    }
+
+    function likePost(uint256 _postId) external {
+        require(_postId > 0 && _postId <= postCounter, "Invalid post ID");
+        require(!hasLiked[_postId][msg.sender], "Already liked");
+
+        hasLiked[_postId][msg.sender] = true;
+        posts[_postId].likes++;
+
+        emit PostLiked(_postId, msg.sender, posts[_postId].likes);
+    }
+
+    function unlikePost(uint256 _postId) external {
+        require(_postId > 0 && _postId <= postCounter, "Invalid post ID");
+        require(hasLiked[_postId][msg.sender], "Not liked yet");
+
+        hasLiked[_postId][msg.sender] = false;
+        posts[_postId].likes--;
+
+        emit PostUnliked(_postId, msg.sender, posts[_postId].likes);
+    }
+
+    function sharePost(uint256 _postId) external {
+        require(_postId > 0 && _postId <= postCounter, "Invalid post ID");
+        require(!hasShared[_postId][msg.sender], "Already shared");
+
+        hasShared[_postId][msg.sender] = true;
+        posts[_postId].shares++;
+
+        emit PostShared(_postId, msg.sender, posts[_postId].shares);
+    }
+
+    function addComment(uint256 _postId, string memory _content) external {
+        require(_postId > 0 && _postId <= postCounter, "Invalid post ID");
+        require(bytes(_content).length > 0, "Comment cannot be empty");
+
+        commentCounter++;
+
+        Comment memory newComment = Comment({
+            id: commentCounter,
+            postId: _postId,
+            author: msg.sender,
+            content: _content,
+            timestamp: block.timestamp
+        });
+
+        postComments[_postId].push(newComment);
+        posts[_postId].commentCount++;
+
+        emit CommentAdded(_postId, commentCounter, msg.sender, _content);
+    }
+
+    function getPost(uint256 _postId) external view returns (Post memory) {
+        require(_postId > 0 && _postId <= postCounter, "Invalid post ID");
+        return posts[_postId];
+    }
+
+    function getAllPosts() external view returns (Post[] memory) {
+        Post[] memory allPosts = new Post[](postCounter);
+        
+        for (uint256 i = 1; i <= postCounter; i++) {
+            allPosts[i - 1] = posts[i];
+        }
+        
+        return allPosts;
+    }
+
+    function getComments(uint256 _postId) external view returns (Comment[] memory) {
+        require(_postId > 0 && _postId <= postCounter, "Invalid post ID");
+        return postComments[_postId];
+    }
+
+    function hasUserLiked(uint256 _postId, address _user) external view returns (bool) {
+        return hasLiked[_postId][_user];
+    }
+
+    function hasUserShared(uint256 _postId, address _user) external view returns (bool) {
+        return hasShared[_postId][_user];
+    }
+
+    function getTotalPosts() external view returns (uint256) {
+        return postCounter;
+    }
+}

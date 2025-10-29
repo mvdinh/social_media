@@ -7,14 +7,21 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "node": "npx hardhat node",
+    "compile": "npx hardhat compile",
+    "deploy": "npx hardhat run scripts/deploy.js --network localhost",
+    "deploy:sepolia": "npx hardhat run scripts/deploy.js --network sepolia",
+    "clean": "hardhat clean",
+    "help": "echo '\n📋 Available Commands:\n  npm run node     - Start Hardhat local node\n  npm run compile  - Compile contracts\n  npm run deploy   - Deploy to localhost\n  npm run test     - Test gas-free transactions\n  npm run clean    - Clean artifacts\n'"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^6.1.0",
-    "hardhat": "^2.26.3"
+    "@types/node": "^24.9.1",
+    "hardhat": "^2.26.3",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "dotenv": "^17.2.3"
