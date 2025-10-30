@@ -27,7 +27,7 @@ function App() {
         <Route path="profile" element={<Profile />} />
         <Route path="profile/:profileId" element={<Profile />} />
         <Route path="create-post" element={<CreatePost />} />
-        <Route path="like" element={<LikeButton/>} />
+        <Route path="like" element={<CheckCreatePost/>} />
       </Route>
     </Routes>
   );

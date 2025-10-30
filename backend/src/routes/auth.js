@@ -1,37 +1,72 @@
 import express from 'express';
 import { ethers } from 'ethers';
-import User from '../models/User.js';
-
 const router = express.Router();
-const nonces = {}; // Lưu nonce tạm thời
 
-// API lấy nonce
-router.get('/get-nonce', (req, res) => {
-  const address = req.query.address;
-  const nonce = Math.floor(Math.random() * 1000000).toString();
-  nonces[address] = nonce;
-  res.json({ nonce });
-});
 
-// API xác thực chữ ký
-router.post('/verify-signature', (req, res) => {
-  const { address, signature } = req.body;
-  const nonce = nonces[address];
-  if (!nonce) return res.status(400).json({ success: false, error: 'Nonce không tồn tại' });
+// Generate nonce endpoint
+router.post('/nonce', async (req, res) => {
+  try {
+    const { address } = req.body;
 
-  const message = `Xác thực hành động Like với nonce: ${nonce}`;
-  const recoveredAddress = ethers.utils.verifyMessage(message, signature);
+    if (!address) {
+      return res.status(400).json({ error: 'Address required' });
+    }
 
-  if (recoveredAddress.toLowerCase() === address.toLowerCase()) {
-    delete nonces[address]; // Xóa nonce sau khi dùng
-    return res.json({ success: true });
-  } else {
-    return res.status(401).json({ success: false, error: 'Chữ ký không hợp lệ' });
+    if (!ethers.isAddress(address)) {
+      return res.status(400).json({ error: 'Invalid Ethereum address' });
+    }
+
+    // Tạo nonce ngẫu nhiên
+    const nonce = Math.floor(Math.random() * 1000000).toString();
+    const message = `Sign this message to authenticate: ${nonce}`;
+
+    res.json({
+      success: true,
+      nonce,
+      message
+    });
+
+  } catch (error) {
+    console.error('Error generating nonce:', error);
+    res.status(500).json({ error: 'Failed to generate nonce' });
   }
 });
 
+// Verify signature endpoint
+router.post('/verify', async (req, res) => {
+  try {
+    const { address, signature, nonce } = req.body;
 
+    if (!address || !signature || !nonce) {
+      return res.status(400).json({ error: 'Address, signature and nonce required' });
+    }
 
+    if (!ethers.isAddress(address)) {
+      return res.status(400).json({ error: 'Invalid Ethereum address' });
+    }
 
+    const normalizedAddress = address.toLowerCase();
+
+    // Verify signature với nonce từ client
+    const message = `Sign this message to authenticate: ${nonce}`;
+    const recoveredAddress = ethers.verifyMessage(message, signature);
+
+    if (recoveredAddress.toLowerCase() !== normalizedAddress) {
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        address: normalizedAddress
+      },
+      message: 'Authentication successful'
+    });
+
+  } catch (error) {
+    console.error('Error verifying signature:', error);
+    res.status(500).json({ error: 'Failed to verify signature' });
+  }
+});
 
 export default router;

@@ -138,12 +138,12 @@ const CreatePost = () => {
         }
         throw error;
       }
-
+      console.log(account, signature, nonce)
       // STEP 3: Verify signature
       console.log('🔍 Step 3: Verifying signature...');
       const verifyResponse = await axios.post(`${API_URL}/auth/verify`, {
-        address: account,
-        signature
+        address: account, 
+        signature, nonce
       });
 
       const { user } = verifyResponse.data;

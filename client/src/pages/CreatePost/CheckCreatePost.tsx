@@ -35,19 +35,25 @@ const CheckCreatePost = () => {
         body: JSON.stringify({ address }),
       });
 
-      const { message } = await nonceRes.json();
+      const { nonce, message } = await nonceRes.json();
 
       // Ký message
       const signature = await signer.signMessage(message);
 
-      // Xác thực
-      await fetch(`${API_URL}/verify`, {
+      // Xác thực - gửi cả nonce lên
+      const verifyRes = await fetch(`${API_URL}/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address, signature }),
+        body: JSON.stringify({ address, signature, nonce }),
       });
 
-      alert("Login successful!");
+      const result = await verifyRes.json();
+
+      if (result.success) {
+        alert("Login successful!");
+      } else {
+        alert("Login failed!");
+      }
 
     } catch (err: any) {
       if (err.code === 4001) {
@@ -78,10 +84,17 @@ const CheckCreatePost = () => {
         body: JSON.stringify({ address: account }),
       });
 
-      const { message } = await nonceRes.json();
+      const { nonce, message } = await nonceRes.json();
 
       // Ký message like với nonce
       const signature = await signer.signMessage(message);
+
+      // Gửi like lên server (nếu cần verify phía server)
+      // const likeRes = await fetch(`${API_URL}/verify`, {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ address: account, signature, nonce }),
+      // });
 
       console.log("Like signature:", signature);
       alert("Like successful!");
