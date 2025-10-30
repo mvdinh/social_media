@@ -1,3 +1,6 @@
+// ===============================================
+// models/User.js - User Model (Authentication only)
+// ===============================================
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 
@@ -13,51 +16,25 @@ const userSchema = new mongoose.Schema({
       message: 'Invalid Ethereum address format'
     }
   },
-  username: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    minlength: 3,
-    maxlength: 45,
+  nonce: { 
+    type: String, 
+    default: null,
     index: true
   },
-  email: {
-    type: String,
-    sparse: true,
-    lowercase: true,
-    trim: true,
-    maxlength: 45,
-    validate: {
-      validator: v => !v || /^\S+@\S+\.\S+$/.test(v),
-      message: 'Invalid email format'
-    }
+  nonceExpiry: { 
+    type: Date, 
+    default: null 
   },
-  name: {
-    type: String,
-    required: true,
-    trim: true,
-    maxlength: 45
-  },
-  coverPic: { type: String, default: '', maxlength: 255 },
-  profilePic: { type: String, default: '', maxlength: 255 },
-  city: { type: String, default: '', maxlength: 45 },
-  nonce: { type: String, default: null },
-  nonceExpiry: { type: Date, default: null },
-  isActive: { type: Boolean, default: true },
-  lastLogin: { type: Date, default: Date.now },
-  loginCount: { type: Number, default: 0 }
+  lastLogin: { 
+    type: Date, 
+    default: Date.now 
+  }
 }, {
   timestamps: true
 });
 
-// Indexes
 userSchema.index({ address: 1 });
-userSchema.index({ username: 1 });
-userSchema.index({ email: 1 });
-userSchema.index({ createdAt: -1 });
 
-// Methods
 userSchema.methods.generateNonce = function() {
   this.nonce = crypto.randomBytes(32).toString('hex');
   this.nonceExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 phút
@@ -75,7 +52,6 @@ userSchema.methods.clearNonce = function() {
 
 userSchema.methods.updateLastLogin = function() {
   this.lastLogin = new Date();
-  this.loginCount += 1;
 };
 
 userSchema.methods.toJSON = function() {

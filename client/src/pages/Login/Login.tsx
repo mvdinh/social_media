@@ -1,199 +1,51 @@
-import { useState, useEffect } from 'react';
-import { Wallet, LogOut, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
-import api from '../../services/api';
-
+import { useState } from 'react';
+import { Wallet, Loader2 } from 'lucide-react';
+import { connect } from 'http2';
+import { connectWallet } from '../../helper/ConnectWallet'; // Giả sử bạn có hàm này để kết nối ví
+import { useNavigate } from 'react-router-dom';
 const Login = () => {
-  const [account, setAccount] = useState(null);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isSigning, setIsSigning] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [balance, setBalance] = useState(null);
-  const [user, setUser] = useState(null);
-  const [tokens, setTokens] = useState(null);
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    // Check if user already logged in
-    const savedTokens = localStorage.getItem('tokens');
-    const savedUser = localStorage.getItem('user');
-    
-    if (savedTokens && savedUser) {
-      // Auto redirect to feed if already logged in
-      window.location.href = '/feed';
-      return;
-    }
+  const handleConnect = async () => {
+    // Ngăn double click
+    if (loading) return;
 
-    // Listen for account changes
-    if (window.ethereum) {
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-      window.ethereum.on('chainChanged', () => window.location.reload());
-    }
+    setLoading(true);
+    setError('');
 
-    return () => {
-      if (window.ethereum) {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-      }
-    };
-  }, []);
-
-  const handleAccountsChanged = (accounts) => {
-    if (accounts.length === 0) {
-      handleLogout();
-    }
-  };
-
-  const getBalance = async (address) => {
     try {
-      const { ethereum } = window;
-      const balance = await ethereum.request({
-        method: 'eth_getBalance',
-        params: [address, 'latest']
-      });
+      // ✅ AWAIT connectWallet
+      const wallet = await connectWallet();
       
-      const balanceInWei = parseInt(balance, 16);
-      const balanceInEth = balanceInWei / Math.pow(10, 18);
-      setBalance(balanceInEth.toFixed(4));
-    } catch (err) {
-      console.error('Error getting balance:', err);
-    }
-  };
-
-  const connectWallet = async () => {
-    try {
-      if (!window.ethereum) {
-        setError('Please install MetaMask!');
-        return;
-      }
-
-      setIsConnecting(true);
-      setError('');
-
-      await window.ethereum.request({
-        method: 'wallet_requestPermissions',
-        params: [{ eth_accounts: {} }]
-      });
-
-      const accounts = await window.ethereum.request({
-        method: 'eth_accounts'
-      });
-
-      if (accounts.length === 0) {
-        setError('No account found');
-        setIsConnecting(false);
-        return;
-      }
-
-      const walletAddress = accounts[0];
-      setAccount(walletAddress);
-      await getBalance(walletAddress);
-      
-      await authenticateUser(walletAddress);
-      
-      setIsConnecting(false);
-
-    } catch (err) {
-      setIsConnecting(false);
-      if (err.code === 4001) {
-        setError('You rejected the connection');
+      // Kiểm tra kết nối thành công
+      if (wallet && wallet.account) {
+        localStorage.setItem("wallet", JSON.stringify({
+          account: wallet.account,
+        }));
+        
+        console.log('✅ Wallet connected, navigating to /feed');
+        
+        // ✅ Dùng navigate() đúng cách
+        navigate('/feed');
       } else {
-        setError(err.message || 'Failed to connect wallet');
+        setError('Failed to connect wallet. Please try again.');
       }
-      console.error(err);
-    }
-  };
-
-  const authenticateUser = async (address) => {
-    try {
-      setIsSigning(true);
-      setError('');
-
-      // Step 1: Get nonce from backend using axios
-      console.log('🔄 Getting nonce...');
-      const nonceData = await api.auth.getNonce(address);
+    } catch (error: any) {
+      console.error('Connection failed:', error);
       
-      if (!nonceData.success) {
-        throw new Error('Failed to get nonce');
-      }
-
-      const { message, timestamp } = nonceData;
-
-      // Step 2: Sign message with MetaMask
-      console.log('✍️ Requesting signature...');
-      const signature = await window.ethereum.request({
-        method: 'personal_sign',
-        params: [message, address]
-      });
-
-      // Step 3: Verify signature with backend using axios
-      console.log('🔐 Verifying signature...');
-      const verifyData = await api.auth.verify(address, signature, timestamp);
-
-      if (!verifyData.success) {
-        throw new Error('Verification failed');
-      }
-
-      // Step 4: Save tokens and user data
-      const { accessToken, refreshToken, user: userData } = verifyData;
-      
-      const tokensData = { accessToken, refreshToken };
-      setTokens(tokensData);
-      setUser(userData);
-      
-      localStorage.setItem('tokens', JSON.stringify(tokensData));
-      localStorage.setItem('user', JSON.stringify(userData));
-
-      console.log('✅ Authentication successful!');
-      setIsSigning(false);
-
-      // Auto redirect to feed after successful login
-      setTimeout(() => {
-        window.location.href = '/feed';
-      }, 1500);
-
-    } catch (err) {
-      setIsSigning(false);
-      
-      if (err.code === 4001 || err.code === 'ACTION_REJECTED') {
-        setError('You rejected the signature request');
-      } else if (err.response) {
-        // Axios error with response
-        setError(err.response.data.error || 'Authentication failed');
-      } else if (err.request) {
-        // Network error
-        setError('Network error. Please check your connection');
+      if (error.code === -32002) {
+        setError('Please check MetaMask popup and approve the connection request.');
+      } else if (error.code === 4001) {
+        setError('Connection rejected by user.');
       } else {
-        setError(err.message || 'Authentication failed');
+        setError('Failed to connect wallet. Please try again.');
       }
-      
-      console.error('❌ Authentication error:', err);
-      setAccount(null);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      if (tokens?.refreshToken) {
-        await api.auth.logout(tokens.refreshToken);
-      }
-    } catch (err) {
-      console.error('Logout error:', err);
     } finally {
-      setAccount(null);
-      setUser(null);
-      setBalance(null);
-      setTokens(null);
-      setError('');
-      
-      localStorage.removeItem('tokens');
-      localStorage.removeItem('user');
+      setLoading(false);
     }
   };
-
-  const formatAddress = (address) => {
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
-  };
-
-  const isAuthenticated = user && tokens;
-
   return (
     <div className="relative min-h-screen flex items-center">
       <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 -z-10"></div>
@@ -223,93 +75,31 @@ const Login = () => {
 
           <div className="order-1 md:order-2">
             <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10">
-              {!isAuthenticated ? (
-                <>
-                  <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl mb-4">
-                      <Wallet className="w-8 h-8 text-white" />
-                    </div>
-                    <h2 className="text-3xl font-bold text-gray-800 mb-2">Sign In</h2>
-                    <p className="text-gray-600">Connect your wallet to continue</p>
-                  </div>
-
-                  {error && (
-                    <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-                      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                      <p className="text-red-600 text-sm">{error}</p>
-                    </div>
-                  )}
-
-                  {isSigning && (
-                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                        <p className="text-blue-700 font-semibold">Authenticating...</p>
-                      </div>
-                      <p className="text-blue-600 text-sm">Please sign the message in MetaMask</p>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={connectWallet}
-                    disabled={isConnecting || isSigning}
-                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-lg"
-                  >
-                    {isConnecting || isSigning ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        {isSigning ? 'Signing...' : 'Connecting...'}
-                      </>
-                    ) : (
-                      <>
-                        <Wallet className="w-5 h-5" />
-                        Connect with MetaMask
-                      </>
-                    )}
-                  </button>
-                </>
-              ) : (
-                <div className="text-center">
-                  <div className="mb-6">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4 animate-bounce">
-                      <CheckCircle className="w-12 h-12 text-green-500" />
-                    </div>
-                    <h2 className="text-3xl font-bold text-gray-800 mb-2">Login Successful! 🎉</h2>
-                    <p className="text-gray-600">Redirecting to feed...</p>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 mb-6">
-                    <div className="flex justify-center mb-4">
-                      <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                        {user.username?.charAt(0).toUpperCase()}
-                      </div>
-                    </div>
-
-                    <h3 className="text-2xl font-bold text-gray-800 mb-2">{user.username}</h3>
-
-                    <div className="mb-4">
-                      <p className="text-sm text-gray-600 mb-1">Wallet Address</p>
-                      <p className="text-lg font-mono font-semibold text-gray-700 bg-white px-4 py-2 rounded-lg">
-                        {formatAddress(user.address)}
-                      </p>
-                    </div>
-
-                    {balance !== null && (
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Balance</p>
-                        <p className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
-                          {balance} ETH
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-center gap-2 text-indigo-600">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span className="font-semibold">Taking you to feed...</span>
-                  </div>
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl mb-4">
+                  <Wallet className="w-8 h-8 text-white" />
                 </div>
-              )}
+                <h2 className="text-3xl font-bold text-gray-800 mb-2">Sign In</h2>
+                <p className="text-gray-600">Connect your wallet to continue</p>
+              </div>
+
+              <button
+                onClick={handleConnect}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-lg"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <Wallet className="w-5 h-5" />
+                    Connect with MetaMask
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

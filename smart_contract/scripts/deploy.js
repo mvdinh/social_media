@@ -22,6 +22,7 @@ async function main() {
   // 🔧 Tạo thư mục nếu chưa tồn tại
   if (!fs.existsSync(configDir)) {
     fs.mkdirSync(configDir, { recursive: true });
+    console.log(`📁 Created config directory: ${configDir}`);
   }
 
   // 💾 Lưu contract address
@@ -39,6 +40,10 @@ async function main() {
   console.log(`💾 Saved ABI to: ${abiFile}`);
 
   console.log("🎉 Deployment complete!");
+  console.log("\n📋 Summary:");
+  console.log(`   Contract: SocialMedia`);
+  console.log(`   Address: ${address}`);
+  console.log(`   Network: ${hre.network.name}`);
 }
 
 main().catch((error) => {

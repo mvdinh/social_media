@@ -6,12 +6,13 @@
   "main": "index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@helia/json": "^5.0.2",
     "@helia/strings": "^5.0.2",
     "@helia/unixfs": "^6.0.2",
     "blockstore-core": "^6.1.1",
@@ -21,11 +22,14 @@
     "ethereumjs-util": "^7.1.5",
     "ethers": "^6.15.0",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
     "helia": "^6.0.7",
+    "helmet": "^8.1.0",
     "ipfs-http-client": "^60.0.1",
     "jsonwebtoken": "^9.0.2",
     "mime-types": "^3.0.1",
     "mongoose": "^8.19.2",
+    "morgan": "^1.10.1",
     "multer": "^2.0.2",
     "multiformats": "^13.4.1",
     "redis": "^5.9.0",

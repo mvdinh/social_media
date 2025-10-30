@@ -1,66 +1,67 @@
-// models/Post.js - Post Model
+// ===============================================
+// models/Post.js - Post Cache (từ blockchain)
 // ===============================================
 import mongoose from 'mongoose';
+
 const postSchema = new mongoose.Schema({
-  desc: {
-    type: String,
-    maxlength: 200,
-    trim: true
+  blockchainId: {
+    type: Number,
+    required: true,
+    unique: true,
+    index: true
   },
-  img: {
+  author: {
     type: String,
-    maxlength: 255
+    required: true,
+    lowercase: true,
+    index: true
   },
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+  contentHash: {
+    type: String,
+    required: true
+  },
+  mediaHashes: [{
+    type: String
+  }],
+  mediaType: {
+    type: Number,
+    enum: [0, 1, 2, 3], // TEXT, IMAGE, VIDEO, MIXED
+    default: 0
+  },
+  timestamp: {
+    type: Date,
     required: true,
     index: true
   },
-  likes: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  likeCount: {
+  likes: {
     type: Number,
     default: 0
   },
-  commentCount: {
+  shares: {
     type: Number,
     default: 0
+  },
+  isNFT: {
+    type: Boolean,
+    default: false
+  },
+  nftTokenId: {
+    type: Number,
+    default: 0
+  },
+  txHash: {
+    type: String,
+    required: true
+  },
+  blockNumber: {
+    type: Number
   }
 }, {
   timestamps: true
 });
 
-// Indexes
-postSchema.index({ userId: 1, createdAt: -1 });
-postSchema.index({ createdAt: -1 });
-
-// Methods
-postSchema.methods.addLike = function(userId) {
-  if (!this.likes.includes(userId)) {
-    this.likes.push(userId);
-    this.likeCount += 1;
-  }
-};
-
-postSchema.methods.removeLike = function(userId) {
-  const index = this.likes.indexOf(userId);
-  if (index > -1) {
-    this.likes.splice(index, 1);
-    this.likeCount -= 1;
-  }
-};
-
-postSchema.methods.incrementCommentCount = function() {
-  this.commentCount += 1;
-};
-
-postSchema.methods.decrementCommentCount = function() {
-  if (this.commentCount > 0) {
-    this.commentCount -= 1;
-  }
-};
+postSchema.index({ blockchainId: 1 });
+postSchema.index({ author: 1, timestamp: -1 });
+postSchema.index({ timestamp: -1 });
 
 export default mongoose.model('Post', postSchema);

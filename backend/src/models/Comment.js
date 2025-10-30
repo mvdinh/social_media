@@ -1,32 +1,45 @@
 // ===============================================
-// models/Comment.js - Comment Model
+// models/Comment.js - Comment Cache (từ blockchain)
 // ===============================================
 import mongoose from 'mongoose';
+
 const commentSchema = new mongoose.Schema({
-  desc: {
+  postId: {
+    type: Number,
+    required: true,
+    index: true
+  },
+  author: {
     type: String,
     required: true,
-    maxlength: 200,
-    trim: true
+    lowercase: true,
+    index: true
   },
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+  contentHash: {
+    type: String,
+    required: true
+  },
+  mediaHash: {
+    type: String,
+    default: ''
+  },
+  timestamp: {
+    type: Date,
     required: true,
     index: true
   },
-  postId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Post',
-    required: true,
-    index: true
+  txHash: {
+    type: String,
+    required: true
+  },
+  blockNumber: {
+    type: Number
   }
 }, {
   timestamps: true
 });
 
-// Indexes
-commentSchema.index({ postId: 1, createdAt: -1 });
-commentSchema.index({ userId: 1 });
+commentSchema.index({ postId: 1, timestamp: -1 });
+commentSchema.index({ author: 1 });
 
 export default mongoose.model('Comment', commentSchema);
