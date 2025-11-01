@@ -6,9 +6,13 @@ import axios from "axios";
 const PINATA_API_KEY = "ee0ab07677049d11295a";
 const PINATA_SECRET = "f09107872299d248f3167f7a4d8d42a714649516b1715cc26315cbbe8dbdca7d";
 
-export async function uploadToIPFS(filePath) {
+export async function uploadToIPFS(filePath,metadata) {
   const data = new FormData();
   data.append("file", fs.createReadStream(filePath));
+
+  if (metadata) {
+    data.append("pinataMetadata", JSON.stringify(metadata));
+  }
 
   const res = await axios.post("https://api.pinata.cloud/pinning/pinFileToIPFS", data, {
     maxBodyLength: Infinity,
