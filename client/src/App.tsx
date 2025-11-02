@@ -9,6 +9,7 @@ import Layout from "./pages/Layout";
 import CreateStoryModal from "./pages/CreateStory";
 import CheckCreatePost from "./pages/CreatePost/CheckCreatePost";
 import LikeButton from "./pages/CreatePost/a";
+import GetAllPost from "./pages/GetAllPost";
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
         <Route path="profile" element={<Profile />} />
         <Route path="profile/:profileId" element={<Profile />} />
         <Route path="create-post" element={<CreatePost />} />
+        <Route path="all-post" element={<GetAllPost />} />
         <Route path="like" element={<CheckCreatePost/>} />
       </Route>
     </Routes>

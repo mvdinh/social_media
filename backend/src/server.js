@@ -11,6 +11,10 @@ import authRoutes from './routes/auth.js';
 import syncRoutes from './routes/sync.js';
 import queryRoutes from './routes/query.js';
 import ipfsRoutes from './routes/ipfs.js';
+import postRoutes from './routes/post.js';
+import deletedbRoutes from './routes/deletedb.js';
+import getPostRoutes from './routes/getPost.js';
+import ipfsProxyRoutes from './routes/ipfsProxy.js';
 
 dotenv.config();
 
@@ -60,7 +64,10 @@ app.use('/api/auth', authRoutes);      // Nonce & Verify
 app.use('/api/sync', syncRoutes);      // Sync blockchain -> DB
 app.use('/api/query', queryRoutes);    // Query từ DB (cache)
 app.use('/api/ipfs', ipfsRoutes);      // IPFS operations
-
+app.use('/api/post', postRoutes); 
+app.use('/api/', getPostRoutes);  // Get posts
+app.use('/api/admin', deletedbRoutes); // Clear DB (dev only)
+app.use('/api/ipfsProxy', ipfsProxyRoutes); // Clear DB (dev only)
 // Health check
 app.get('/health', (req, res) => {
   res.json({ 

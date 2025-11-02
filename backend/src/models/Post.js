@@ -1,6 +1,3 @@
-// ===============================================
-// models/Post.js - Post Cache (từ blockchain)
-// ===============================================
 import mongoose from 'mongoose';
 
 const postSchema = new mongoose.Schema({

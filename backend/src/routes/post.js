@@ -1,242 +1,150 @@
-
-import {Post } from "../models/Post.js";
-import {ipfsService} from "../services/ipfsService.js";
+// routes/posts.js
 import express from "express";
+import { ethers } from "ethers";
+import mongoose from "mongoose";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import Post from "../models/Post.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// === Load ABI & Address ===
+const contractABI = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "../config/SocialMedia.json"), "utf-8")
+);
+const contractAddress = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "../config/contract-address.json"), "utf-8")
+);
+
+// === Blockchain Config ===
+const RPC_URL = process.env.RPC_URL || "http://127.0.0.1:8545"; // local Hardhat node
+const PRIVATE_KEY =
+  process.env.PRIVATE_KEY ||
+  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"; // ⚠️ Private key của Hardhat node
+
+const provider = new ethers.JsonRpcProvider(RPC_URL);
+const signer = new ethers.Wallet(PRIVATE_KEY, provider);
+const contract = new ethers.Contract(contractAddress.SocialMedia, contractABI.abi, signer);
+
+console.log("✅ Blockchain connected at:", RPC_URL);
+console.log("👛 Signer address:", await signer.getAddress());
+
+// === Router ===
 const router = express.Router();
 
-// Contract configuration
-const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
-const CONTRACT_ABI = [
-  "event PostCreated(uint256 indexed postId, address indexed author, string contentHash, uint8 mediaType)",
-  "event PostLiked(uint256 indexed postId, address indexed user)",
-  "event PostUnliked(uint256 indexed postId, address indexed user)",
-  "event PostShared(uint256 indexed postId, address indexed user)",
-  "event CommentAdded(uint256 indexed postId, address indexed author, string contentHash)",
-  "event PostMintedAsNFT(uint256 indexed postId, uint256 indexed tokenId, address indexed owner)",
-  "function getPost(uint256 _postId) public view returns (tuple(uint256 id, address author, string contentHash, string[] mediaHashes, uint8 mediaType, uint256 timestamp, uint256 likes, uint256 shares, uint256 nftTokenId, bool isNFT))",
-  "function getComments(uint256 _postId) public view returns (tuple(address author, string contentHash, string mediaHash, uint256 timestamp)[])",
-  "function postCount() public view returns (uint256)"
-];
-
-const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
-const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
-
-// ===============================================
-// Sync Single Post from Blockchain
-// ===============================================
-router.post('/post/:postId', async (req, res) => {
+// === POST: Tạo bài viết mới ===
+router.post("/", async (req, res) => {
   try {
-    const { postId } = req.params;
+    const { contentHash, mediaHashes, mediaType, walletAddress } = req.body;
 
-    const blockchainPost = await contract.getPost(postId);
+    console.log("📥 Creating post on blockchain...");
 
-    if (blockchainPost.id.toString() === '0') {
-      return res.status(404).json({ error: 'Post not found on blockchain' });
-    }
-
-    // Check if already exists
-    let post = await Post.findOne({ blockchainId: Number(postId) });
-
-    if (!post) {
-      post = new Post({
-        blockchainId: Number(postId),
-        author: blockchainPost.author.toLowerCase(),
-        contentHash: blockchainPost.contentHash,
-        mediaHashes: blockchainPost.mediaHashes,
-        mediaType: blockchainPost.mediaType,
-        timestamp: new Date(Number(blockchainPost.timestamp) * 1000),
-        likes: Number(blockchainPost.likes),
-        shares: Number(blockchainPost.shares),
-        isNFT: blockchainPost.isNFT,
-        nftTokenId: Number(blockchainPost.nftTokenId),
-        txHash: req.body.txHash || ''
-      });
+    let tx;
+    if (mediaHashes && mediaHashes.length > 0) {
+      tx = await contract.createPostWithMedia(contentHash, mediaHashes, mediaType);
     } else {
-      // Update existing
-      post.likes = Number(blockchainPost.likes);
-      post.shares = Number(blockchainPost.shares);
-      post.isNFT = blockchainPost.isNFT;
-      post.nftTokenId = Number(blockchainPost.nftTokenId);
+      tx = await contract.createPost(contentHash);
     }
 
-    await post.save();
+    console.log("⏳ Waiting for transaction confirmation...");
+    const receipt = await tx.wait();
+    console.log("📜 Transaction confirmed:", receipt.hash);
 
-    res.json({
-      success: true,
-      post,
-      message: 'Post synced successfully'
-    });
-
-  } catch (error) {
-    console.error('Error syncing post:', error);
-    res.status(500).json({ error: 'Failed to sync post' });
-  }
-});
-
-// ===============================================
-// Sync All Posts from Blockchain
-// ===============================================
-router.post('/posts/all', async (req, res) => {
-  try {
-    const postCount = await contract.postCount();
-    const total = Number(postCount);
-
-    let synced = 0;
-    let errors = 0;
-
-    for (let i = 1; i <= total; i++) {
-      try {
-        const blockchainPost = await contract.getPost(i);
-        
-        let post = await Post.findOne({ blockchainId: i });
-
-        if (!post) {
-          post = new Post({
-            blockchainId: i,
-            author: blockchainPost.author.toLowerCase(),
-            contentHash: blockchainPost.contentHash,
-            mediaHashes: blockchainPost.mediaHashes,
-            mediaType: blockchainPost.mediaType,
-            timestamp: new Date(Number(blockchainPost.timestamp) * 1000),
-            likes: Number(blockchainPost.likes),
-            shares: Number(blockchainPost.shares),
-            isNFT: blockchainPost.isNFT,
-            nftTokenId: Number(blockchainPost.nftTokenId),
-            txHash: ''
-          });
-        } else {
-          post.likes = Number(blockchainPost.likes);
-          post.shares = Number(blockchainPost.shares);
-          post.isNFT = blockchainPost.isNFT;
-          post.nftTokenId = Number(blockchainPost.nftTokenId);
+    // Lấy event PostCreated từ logs
+    const event = receipt.logs
+      .map((log) => {
+        try {
+          return contract.interface.parseLog(log);
+        } catch {
+          return null;
         }
+      })
+      .find((e) => e && e.name === "PostCreated");
 
-        await post.save();
-        synced++;
-      } catch (err) {
-        console.error(`Error syncing post ${i}:`, err);
-        errors++;
-      }
+    if (!event) {
+      throw new Error("Không tìm thấy event PostCreated trong transaction logs");
     }
+
+    // Với Ethers v6: kết quả là BigInt -> cần convert sang Number
+    const blockchainPostId = Number(event.args[0]); // postId
+    const authorAddress = event.args[1];
+    const ipfsHash = event.args[2];
+
+    console.log(
+      `✅ PostCreated Event -> ID: ${blockchainPostId}, Author: ${authorAddress}, IPFS: ${ipfsHash}`
+    );
+
+    // Lưu vào MongoDB
+    const post = await Post.create({
+      blockchainId: blockchainPostId,
+      author: walletAddress,
+      contentHash,
+      mediaHashes: mediaHashes || [],
+      mediaType: mediaType || 0,
+      timestamp: Date.now(),
+      likes: 0,
+      shares: 0,
+      isNFT: false,
+      nftTokenId: 0,
+      txHash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      createdAt: new Date(),
+    });
 
     res.json({
       success: true,
+      blockchainPostId,
+      dbPostId: post._id,
+      txHash: receipt.hash,
+    });
+  } catch (error) {
+    console.error("❌ Error creating post:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/', async (req, res) => {
+  const posts = await Post.find().sort({ createdAt: -1 }).limit(20);
+  const total = await Post.countDocuments();
+
+    res.json({
       total,
-      synced,
-      errors,
-      message: `Synced ${synced}/${total} posts`
+      posts
     });
-
-  } catch (error) {
-    console.error('Error syncing all posts:', error);
-    res.status(500).json({ error: 'Failed to sync posts' });
-  }
 });
 
-// ===============================================
-// Get All Posts (Timeline)
-// ===============================================
-router.get('/posts', async (req, res) => {
+router.get('/:id/verify', async (req, res) => {
   try {
-    const { page = 1, limit = 20, author } = req.query;
+    const dbPost = await Post.findOne({ blockchainId: req.params.id });
+    if (!dbPost) return res.status(404).json({ error: 'Post not found in DB' });
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const blockchainPost = await contract.getPost(req.params.id);
 
-    const filter = author ? { author: author.toLowerCase() } : {};
+    const isValid =
+      dbPost.author.toLowerCase() === blockchainPost.author.toLowerCase() &&
+      dbPost.contentHash === blockchainPost.contentHash;
 
-    const posts = await Post.find(filter)
-      .sort({ timestamp: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
-
-    const total = await Post.countDocuments(filter);
+    // 🔧 Convert BigInt → String trước khi trả về
+    const blockchainPostNormalized = Object.fromEntries(
+      Object.entries(blockchainPost).map(([key, value]) => [
+        key,
+        typeof value === 'bigint' ? value.toString() : value
+      ])
+    );
 
     res.json({
-      posts,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / parseInt(limit))
-      }
+      isValid,
+      dbData: dbPost,
+      blockchainData: blockchainPostNormalized
     });
 
   } catch (error) {
-    console.error('Error getting posts:', error);
-    res.status(500).json({ error: 'Failed to get posts' });
+    console.error("❌ Verify error:", error);
+    res.status(500).json({ error: error.message });
   }
 });
 
-// ===============================================
-// Get Single Post with Full Details
-// ===============================================
-router.get('/post/:postId', async (req, res) => {
-  try {
-    const { postId } = req.params;
-    const { includeContent = false } = req.query;
 
-    const post = await Post.findOne({ 
-      blockchainId: Number(postId) 
-    }).lean();
-
-    if (!post) {
-      return res.status(404).json({ error: 'Post not found' });
-    }
-
-    // Optionally fetch IPFS content
-    let content = null;
-    if (includeContent === 'true' && post.contentHash) {
-      try {
-        content = await ipfsService.getJSON(post.contentHash);
-      } catch (err) {
-        console.error('Error fetching IPFS content:', err);
-      }
-    }
-
-    // Get comment count
-    const commentCount = await Comment.countDocuments({ 
-      postId: Number(postId) 
-    });
-
-    res.json({
-      ...post,
-      commentCount,
-      content
-    });
-
-  } catch (error) {
-    console.error('Error getting post:', error);
-    res.status(500).json({ error: 'Failed to get post' });
-  }
-});
-
-// ===============================================
-// Get Post Content from IPFS
-// ===============================================
-router.get('/post/:postId/content', async (req, res) => {
-  try {
-    const { postId } = req.params;
-
-    const post = await Post.findOne({ 
-      blockchainId: Number(postId) 
-    });
-
-    if (!post) {
-      return res.status(404).json({ error: 'Post not found' });
-    }
-
-    // Fetch from IPFS
-    const content = await ipfsService.getJSON(post.contentHash);
-
-    res.json({
-      success: true,
-      contentHash: post.contentHash,
-      content
-    });
-
-  } catch (error) {
-    console.error('Error getting post content:', error);
-    res.status(500).json({ error: 'Failed to get post content' });
-  }
-});
+export default router;

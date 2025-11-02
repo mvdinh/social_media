@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import axios from 'axios';
 import { Image, X, Loader2, Shield } from 'lucide-react';
+import { verifySignature } from '../../helper/VerifySignature';
+import { uploadToIpfs } from '../../helper/UploadToIpfs';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
@@ -17,6 +19,20 @@ const CreatePost = () => {
   const [posting, setPosting] = useState(false);
   const [previews, setPreviews] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Fetch posts on mount
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/post`);
+        console.log('📥 Fetched posts:', response.data);
+      } catch (error) {
+        console.error('❌ Error fetching posts:', error);
+      }
+    };
+
+    fetchPosts();
+  }, []);
 
   // Initialize contract on mount
   useEffect(() => {
@@ -64,23 +80,6 @@ const CreatePost = () => {
     }
   };
 
-  // Test nonce function
-  const testNonce = async () => {
-    try {
-      console.log('🧪 Testing nonce with address:', account);
-      
-      const response = await axios.post(`${API_URL}/auth/nonce`, {
-        address: account
-      });
-      
-      console.log('✅ Nonce response:', response.data);
-      alert(`Nonce test successful!\n\nNonce: ${response.data.nonce}\nMessage: ${response.data.message}`);
-    } catch (error: any) {
-      console.error('❌ Nonce test failed:', error.response?.data || error.message);
-      alert(`Nonce test failed!\n\n${error.response?.data?.error || error.message}`);
-    }
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const newFiles = Array.from(e.target.files).slice(0, 4 - files.length);
@@ -109,151 +108,102 @@ const CreatePost = () => {
 
     try {
       setPosting(true);
-      console.log('🚀 Starting post creation for account:', account);
 
-      // STEP 1: Get nonce for authentication
-      console.log('📝 Step 1: Requesting nonce...');
-      const nonceResponse = await axios.post(`${API_URL}/auth/nonce`, {
-        address: account
-      });
+      // STEP 1: Verify user signature
+      console.log('🔐 Step 1: Verifying signature...');
+      const { user, token } = await verifySignature(account);
+      console.log('✅ User verified:', user);
 
-      const { nonce, message } = nonceResponse.data;
-      console.log('✅ Nonce received:', nonce);
-      console.log('📜 Message to sign:', message);
+      // STEP 2: Upload to IPFS
+      console.log('📤 Step 2: Uploading to IPFS...');
+      const { contentHash, mediaHashes } = await uploadToIpfs(content, account, files);
+      console.log('✅ IPFS upload complete:', { contentHash, mediaHashes });
 
-      // STEP 2: Request MetaMask signature for authentication
-      console.log('🔐 Step 2: Opening MetaMask for authentication signature...');
-      alert('⚠️ MetaMask will open!\n\nPlease sign the message to authenticate your account.\n\nThis does NOT cost any gas.');
+      // STEP 3: Call backend API để tạo post
+      // Backend sẽ tự động tạo transaction trên blockchain và lưu vào DB
+      console.log('🔄 Step 3: Creating post via backend API...');
       
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      
-      let signature;
-      try {
-        signature = await signer.signMessage(message);
-        console.log('✅ Signature obtained:', signature.slice(0, 20) + '...');
-      } catch (error: any) {
-        if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
-          throw new Error('You rejected the authentication signature');
-        }
-        throw error;
-      }
-      console.log(account, signature, nonce)
-      // STEP 3: Verify signature
-      console.log('🔍 Step 3: Verifying signature...');
-      const verifyResponse = await axios.post(`${API_URL}/auth/verify`, {
-        address: account, 
-        signature, nonce
-      });
-
-      const { user } = verifyResponse.data;
-      console.log('✅ Authentication successful! User:', user.username);
-
-      // STEP 4: Upload content to IPFS
-      console.log('📤 Step 4: Uploading content to IPFS...');
-      const postData = { 
-        content, 
-        author: account, 
-        username: user.username,
-        timestamp: Date.now(),
-        nonce
+      const postData = {
+        contentHash,
+        mediaHashes: mediaHashes.length > 0 ? mediaHashes : undefined,
+        mediaType: mediaHashes.length > 0 ? 1 : 0, // 1 = IMAGE, 0 = TEXT_ONLY
+        walletAddress: account
       };
 
-      const contentResponse = await axios.post(`${API_URL}/ipfs/upload-json`, postData);
-      const contentHash = contentResponse.data.cid;
-      console.log('✅ Content uploaded to IPFS:', contentHash);
+      console.log('📤 Sending data to backend:', postData);
 
-      // STEP 5: Upload media files if any
-      let mediaHashes: string[] = [];
-      if (files.length > 0) {
-        console.log(`📤 Step 5: Uploading ${files.length} media files...`);
+      const response = await axios.post(
+        `${API_URL}/post`,
+        postData,
         
-        const uploadPromises = files.map(async (file, index) => {
-          const formData = new FormData();
-          formData.append('file', file);
-          
-          const response = await axios.post(`${API_URL}/ipfs/upload`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
-          
-          console.log(`✅ File ${index + 1}/${files.length} uploaded:`, response.data.cid);
-          return response.data.cid;
-        });
-
-        mediaHashes = await Promise.all(uploadPromises);
-      }
-
-      // STEP 6: Create post on blockchain
-      console.log('⛓️ Step 6: Creating post on blockchain...');
-      alert('⚠️ MetaMask will open again!\n\nPlease confirm the transaction to create your post on blockchain.\n\nThis WILL cost gas fees.');
-      
-      let tx;
-      try {
-        if (mediaHashes.length > 0) {
-          tx = await contract.createPostWithMedia(contentHash, mediaHashes, 1);
-        } else {
-          tx = await contract.createPost(contentHash);
-        }
-      } catch (error: any) {
-        if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
-          throw new Error('You rejected the transaction');
-        }
-        throw error;
-      }
-
-      console.log('⏳ Waiting for transaction confirmation...');
-      const receipt = await tx.wait();
-      console.log('✅ Transaction confirmed! Hash:', receipt.hash);
-      
-      // STEP 7: Get postId from event
-      console.log('🔍 Step 7: Extracting post ID from event...');
-      const event = receipt.logs.find((log: any) => 
-        log.topics[0] === contract.interface.getEvent('PostCreated').topicHash
       );
-      
-      let postId;
-      if (event) {
-        const decoded = contract.interface.parseLog(event);
-        postId = decoded.args.postId.toString();
-        console.log('📝 Post ID:', postId);
+
+      console.log('✅ Backend response:', response.data);
+
+      if (response.data.success) {
+        const { blockchainPostId, txHash, dbPostId } = response.data;
+
+        // Success notification
+        alert(
+          `✅ Post created successfully!\n\n` +
+          `Post ID: ${blockchainPostId}\n` +
+          `Database ID: ${dbPostId}\n` +
+          `Transaction: ${txHash.slice(0, 10)}...${txHash.slice(-8)}`
+        );
+
+        // Reset form
+        setContent('');
+        setFiles([]);
+        setPreviews([]);
+
+        // Reload to show new post
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        throw new Error('Backend returned unsuccessful response');
       }
-
-      // STEP 8: Sync to backend
-      if (postId) {
-        console.log('🔄 Step 8: Syncing to backend...');
-        await axios.post(`${API_URL}/sync/post/${postId}`, {
-          txHash: receipt.hash
-        });
-        console.log('✅ Post synced to backend');
-      }
-
-      // Success - reset form
-      setContent('');
-      setFiles([]);
-      setPreviews([]);
-      
-      console.log('🎉 Post creation completed successfully!');
-      alert(`✅ Post created successfully!\n\nPost ID: ${postId}\nTransaction: ${receipt.hash}\n\nReloading timeline...`);
-
-      // Reload after short delay
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
 
     } catch (error: any) {
       console.error('❌ Error creating post:', error);
-      
-      let msg = 'Failed to create post';
-      
-      if (error.response) {
-        // Axios error with response
-        msg = error.response.data?.error || error.response.data?.details || msg;
-      } else if (error.message) {
-        // Custom error message
-        msg = error.message;
+
+      // Detailed error handling
+      if (axios.isAxiosError(error)) {
+        const { response, code } = error;
+
+        if (response) {
+          console.error('📡 Server Error:', {
+            status: response.status,
+            statusText: response.statusText,
+            data: response.data
+          });
+
+          const errorMsg = response.data?.error || response.statusText;
+          
+          switch (response.status) {
+            case 400:
+              alert(`❌ Invalid data: ${errorMsg}`);
+              break;
+            case 401:
+              alert('❌ Authentication failed. Please reconnect your wallet.');
+              break;
+            case 500:
+              alert(`❌ Server error: ${errorMsg}\n\nPlease try again.`);
+              break;
+            default:
+              alert(`❌ Error (${response.status}): ${errorMsg}`);
+          }
+        } else if (code === 'ECONNABORTED') {
+          alert('⏱️ Request timeout. The blockchain transaction may take longer.\n\nPlease check your post in a moment.');
+        } else if (code === 'ERR_NETWORK' || code === 'ECONNREFUSED') {
+          alert('🌐 Cannot connect to server.\n\nPlease make sure the backend is running at ' + API_URL);
+        } else {
+          alert(`❌ Network error: ${error.message}`);
+        }
+      } else {
+        // Non-axios errors (e.g., from verifySignature or uploadToIpfs)
+        const errorMsg = error.message || 'Unknown error occurred';
+        alert(`❌ ${errorMsg}`);
       }
-      
-      alert(`❌ ${msg}`);
+
     } finally {
       setPosting(false);
     }
@@ -389,18 +339,11 @@ const CreatePost = () => {
         </div>
       </div>
       
-      {/* Connected account & Test button */}
-      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+      {/* Connected account info */}
+      <div className="mt-3 pt-3 border-t border-gray-100">
         <p className="text-xs text-gray-500">
           Connected: <span className="font-mono">{account.slice(0, 6)}...{account.slice(-4)}</span>
         </p>
-        
-        <button
-          onClick={testNonce}
-          className="text-xs text-blue-500 hover:text-blue-600 font-medium px-3 py-1 rounded-full hover:bg-blue-50 transition-colors"
-        >
-          🧪 Test Nonce
-        </button>
       </div>
     </div>
   );
