@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
 import contractAddress from '../config/contract-address.json';
 import contractABI from '../config/SocialMedia.json';
+import { setUserAddressHeader } from '../services/api';
 
 const WALLET_KEY = 'wallet_account';
 const CONTRACT_KEY = 'social_contract';
@@ -24,11 +25,10 @@ export const connectWallet = async () => {
       return null;
     }
 
-    
     await window.ethereum.request({
-        method: 'wallet_requestPermissions',
-        params: [{ eth_accounts: {} }],
-      });
+      method: 'wallet_requestPermissions',
+      params: [{ eth_accounts: {} }],
+    });
 
     const web3Provider = new ethers.BrowserProvider(window.ethereum);
     await web3Provider.send('eth_requestAccounts', []);
@@ -38,6 +38,9 @@ export const connectWallet = async () => {
     // Lưu account vào localStorage
     saveAccount(userAccount);
 
+    // 🔥 Cực kỳ quan trọng: gửi address vào axios header cho toàn bộ API
+    setUserAddressHeader(userAccount.toLowerCase());
+
     // Khởi tạo contract
     const socialMediaContract = new ethers.Contract(
       contractAddress.SocialMedia,
@@ -45,15 +48,11 @@ export const connectWallet = async () => {
       userSigner
     );
 
-    // Nếu có hàm loadPosts, gọi
-
     console.log('✅ Wallet connected:', userAccount);
 
     return { account: userAccount, provider: web3Provider, contract: socialMediaContract };
   } catch (error) {
     console.error('Error connecting wallet:', error);
     return null;
-  } finally {
-    
   }
 };

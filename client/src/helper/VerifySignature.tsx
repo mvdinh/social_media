@@ -1,6 +1,7 @@
 import React from 'react';
 import axios from 'axios';
 import { ethers } from 'ethers';
+import { ensureMessagingKeySynced } from './cryptoSync'; // 👉 file helper mới
 
 const API_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -16,6 +17,7 @@ export const verifySignature = async (account: string) => {
     console.log('📜 Message to sign:', message);
 
     // STEP 2: Sign the message with the wallet
+    if (!window.ethereum) throw new Error('MetaMask not found.');
     const provider = new ethers.BrowserProvider(window.ethereum);
     const signer = await provider.getSigner();
 
@@ -40,7 +42,15 @@ export const verifySignature = async (account: string) => {
     const { user, token } = verifyResponse.data;
     console.log('✅ Authentication successful! User:', user.username);
 
-    // Optionally return the data
+    // STEP 4: Ensure messaging public key is synced
+    try {
+      await ensureMessagingKeySynced(account);
+      console.log('🔑 Messaging key synced successfully.');
+    } catch (err) {
+      console.error('⚠️ Failed to sync messaging key:', err);
+    }
+
+    // STEP 5: Return user and token
     return { user, token };
   } catch (err) {
     console.error('❌ Signature verification failed:', err);

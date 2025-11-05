@@ -1,17 +1,21 @@
+// services/api.ts
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
-// Create axios instance
-const apiClient = axios.create({
+/* --------------------------------------------
+   🔹 1. Tạo axios instance chính cho toàn bộ app
+--------------------------------------------- */
+export const apiClient = axios.create({
   baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  timeout: 10000
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 10000,
+  withCredentials: false
 });
 
-// Request interceptor - Add token to all requests
+/* --------------------------------------------
+   🔹 2. Interceptors: thêm token + refresh token
+--------------------------------------------- */
 apiClient.interceptors.request.use(
   (config) => {
     const tokens = localStorage.getItem('tokens');
@@ -21,217 +25,156 @@ apiClient.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor - Handle token refresh
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // If 401 and haven't retried yet
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-
       try {
         const tokens = localStorage.getItem('tokens');
-        if (!tokens) {
-          throw new Error('No refresh token');
-        }
+        if (!tokens) throw new Error('No refresh token');
 
         const { refreshToken } = JSON.parse(tokens);
-        
-        // Call refresh token endpoint
-        const response = await axios.post(`${API_URL}/auth/refresh`, {
-          refreshToken
-        });
+        const response = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
 
         if (response.data.success) {
           const newTokens = {
             accessToken: response.data.accessToken,
             refreshToken
           };
-          
-          // Save new tokens
           localStorage.setItem('tokens', JSON.stringify(newTokens));
-          
-          // Update authorization header
           originalRequest.headers.Authorization = `Bearer ${response.data.accessToken}`;
-          
-          // Retry original request
           return apiClient(originalRequest);
         }
       } catch (refreshError) {
-        // Refresh failed, logout user
         localStorage.clear();
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
     }
-
     return Promise.reject(error);
   }
 );
 
-// API Methods
+/* --------------------------------------------
+   🔹 3. Hỗ trợ E2E chat: thêm header địa chỉ ví
+--------------------------------------------- */
+export function setUserAddressHeader(address?: string) {
+  if (address) apiClient.defaults.headers.common['x-user-address'] = address;
+  else delete apiClient.defaults.headers.common['x-user-address'];
+}
+
+/* --------------------------------------------
+   🔹 4. API nhóm 1: xác thực & người dùng
+--------------------------------------------- */
 const api = {
-  // Auth endpoints
   auth: {
-    getNonce: async (address) => {
-      const response = await apiClient.post('/auth/nonce', { address });
-      return response.data;
+    getNonce: async (address: string) => {
+      const res = await apiClient.post('/auth/nonce', { address });
+      return res.data;
     },
-
-    verify: async (address, signature, timestamp) => {
-      const response = await apiClient.post('/auth/verify', {
-        address,
-        signature,
-        timestamp
-      });
-      return response.data;
+    verify: async (address: string, signature: string, timestamp?: number) => {
+      const res = await apiClient.post('/auth/verify', { address, signature, timestamp });
+      return res.data;
     },
-
-    refresh: async (refreshToken) => {
-      const response = await apiClient.post('/auth/refresh', { refreshToken });
-      return response.data;
+    refresh: async (refreshToken: string) => {
+      const res = await apiClient.post('/auth/refresh', { refreshToken });
+      return res.data;
     },
-
-    logout: async (refreshToken) => {
-      const response = await apiClient.post('/auth/logout', { refreshToken });
-      return response.data;
+    logout: async (refreshToken: string) => {
+      const res = await apiClient.post('/auth/logout', { refreshToken });
+      return res.data;
     },
-
-    logoutAll: async () => {
-      const response = await apiClient.post('/auth/logout-all');
-      return response.data;
-    },
-
     getMe: async () => {
-      const response = await apiClient.get('/auth/me');
-      return response.data;
+      const res = await apiClient.get('/auth/me');
+      return res.data;
     }
   },
 
-  // User endpoints
   user: {
+
     getProfile: async () => {
-      const response = await apiClient.get('/user/profile');
-      return response.data;
+      const res = await apiClient.get('/user/profile');
+      return res.data;
     },
-
-    updateProfile: async (data) => {
-      const response = await apiClient.put('/user/profile', data);
-      return response.data;
+    updateProfile: async (data: any) => {
+      const res = await apiClient.put('/user/profile', data);
+      return res.data;
     },
-
-    getUser: async (username) => {
-      const response = await apiClient.get(`/user/${username}`);
-      return response.data;
-    },
-
     getUsers: async (page = 1, limit = 20, search = '') => {
-      const response = await apiClient.get('/users', {
-        params: { page, limit, search }
-      });
-      return response.data;
+      const res = await apiClient.get('/users', { params: { page, limit, search } });
+      return res.data;
     },
-
-    getFollowers: async (userId, page = 1, limit = 20) => {
-      const response = await apiClient.get(`/user/${userId}/followers`, {
-        params: { page, limit }
-      });
-      return response.data;
+    follow: async (userId: string) => {
+      const res = await apiClient.post(`/user/${userId}/follow`);
+      return res.data;
     },
-
-    getFollowing: async (userId, page = 1, limit = 20) => {
-      const response = await apiClient.get(`/user/${userId}/following`, {
-        params: { page, limit }
-      });
-      return response.data;
-    },
-
-    follow: async (userId) => {
-      const response = await apiClient.post(`/user/${userId}/follow`);
-      return response.data;
-    },
-
-    unfollow: async (userId) => {
-      const response = await apiClient.delete(`/user/${userId}/unfollow`);
-      return response.data;
-    },
-
-    getSuggestions: async (limit = 10) => {
-      const response = await apiClient.get('/user/search/suggestions', {
-        params: { limit }
-      });
-      return response.data;
+    unfollow: async (userId: string) => {
+      const res = await apiClient.delete(`/user/${userId}/unfollow`);
+      return res.data;
     }
   },
 
-  // Post endpoints (for future use)
   posts: {
-    create: async (data) => {
-      const response = await apiClient.post('/posts', data);
-      return response.data;
-    },
-
     getFeed: async (page = 1, limit = 20) => {
-      const response = await apiClient.get('/posts/feed', {
-        params: { page, limit }
-      });
-      return response.data;
+      const res = await apiClient.get('/posts/feed', { params: { page, limit } });
+      return res.data;
     },
-
-    getPost: async (postId) => {
-      const response = await apiClient.get(`/posts/${postId}`);
-      return response.data;
+    create: async (data: any) => {
+      const res = await apiClient.post('/posts', data);
+      return res.data;
     },
-
-    getUserPosts: async (userId, page = 1, limit = 20) => {
-      const response = await apiClient.get(`/posts/user/${userId}`, {
-        params: { page, limit }
-      });
-      return response.data;
+    like: async (postId: string) => {
+      const res = await apiClient.post(`/posts/${postId}/like`);
+      return res.data;
     },
-
-    update: async (postId, data) => {
-      const response = await apiClient.put(`/posts/${postId}`, data);
-      return response.data;
-    },
-
-    delete: async (postId) => {
-      const response = await apiClient.delete(`/posts/${postId}`);
-      return response.data;
-    },
-
-    like: async (postId) => {
-      const response = await apiClient.post(`/posts/${postId}/like`);
-      return response.data;
-    },
-
-    unlike: async (postId) => {
-      const response = await apiClient.delete(`/posts/${postId}/unlike`);
-      return response.data;
-    },
-
-    comment: async (postId, desc) => {
-      const response = await apiClient.post(`/posts/${postId}/comment`, { desc });
-      return response.data;
-    },
-
-    getComments: async (postId) => {
-      const response = await apiClient.get(`/posts/${postId}/comments`);
-      return response.data;
-    },
-
-    deleteComment: async (postId, commentId) => {
-      const response = await apiClient.delete(`/posts/${postId}/comments/${commentId}`);
-      return response.data;
+    comment: async (postId: string, desc: string) => {
+      const res = await apiClient.post(`/posts/${postId}/comment`, { desc });
+      return res.data;
     }
   }
 };
 
+export const Users = {
+  updateMe: (messagingPublicKey: string) =>
+    apiClient.patch('/users/me', { messagingPublicKey }).then((r) => r.data)
+};
+
+export const Conversations = {
+  createDM: (peerAddress: string) =>
+    apiClient.post('/messages/conversations/dm', { peerAddress }).then((r) => r.data),
+  list: (cursor?: string, limit = 20) =>
+    apiClient.get('/messages/conversations', { params: { cursor, limit } }).then((r) => r.data)
+};
+
+export const ChatMessages = {
+  list: (conversationId: string, cursor?: string, limit = 50) =>
+    apiClient
+      .get('/messages/messages', { params: { conversationId, cursor, limit } })
+      .then((r) => r.data),
+  uploadEncrypted: (b64: string, filename = 'msg.bin') =>
+    apiClient.post('/messages/uploadEncrypted', { b64, filename }).then((r) => r.data),
+  fetchEncrypted: (cid: string) =>
+    apiClient.get('/messages/fetchEncrypted', { params: { cid } }).then((r) => r.data),
+  create: (payload: {
+    conversationId: string;
+    cid: string;
+    nonce: string;
+    contentType?: string;
+    bytes?: number;
+    hash?: string;
+    preview?: string;
+  }) => apiClient.post('/messages/messages', payload).then((r) => r.data),
+  delivered: (id: string) => apiClient.post(`/messages/messages/${id}/delivered`),
+  read: (id: string) => apiClient.post(`/messages/messages/${id}/read`)
+};
+
+/* --------------------------------------------
+   🔹 6. Export
+--------------------------------------------- */
 export default api;
