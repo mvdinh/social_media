@@ -170,12 +170,21 @@ contract SocialMedia is ERC721 {
         emit PostUnliked(_postId, msg.sender);
     }
 
+    mapping(uint256 => address[]) public postShares;
+
     function sharePost(uint256 _postId) public {
         require(_postId > 0 && _postId <= postCount, "Post does not exist");
 
         posts[_postId].shares++;
+        postShares[_postId].push(msg.sender);
 
         emit PostShared(_postId, msg.sender);
+    }
+    function getPostShares(
+        uint256 _postId
+    ) public view returns (address[] memory) {
+        require(_postId > 0 && _postId <= postCount, "Post does not exist");
+        return postShares[_postId];
     }
 
     // Add text comment

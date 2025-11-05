@@ -9,7 +9,7 @@ const shareSchema = new mongoose.Schema({
     required: true,
     index: true
   },
-  user: {
+  author: {
     type: String,
     required: true,
     lowercase: true,

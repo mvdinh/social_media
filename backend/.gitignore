@@ -1,6 +1,9 @@
 # Node modules
 node_modules/
 
+#helia 
+helia_storage/
+
 # Build output
 dist/
 build/

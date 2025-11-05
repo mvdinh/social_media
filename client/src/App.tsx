@@ -10,6 +10,7 @@ import CreateStoryModal from "./pages/CreateStory";
 import CheckCreatePost from "./pages/CreatePost/CheckCreatePost";
 import LikeButton from "./pages/CreatePost/a";
 import GetAllPost from "./pages/GetAllPost";
+import BlockchainSocial from "./Test/Post";
 
 function App() {
   return (
@@ -30,7 +31,10 @@ function App() {
         <Route path="create-post" element={<CreatePost />} />
         <Route path="all-post" element={<GetAllPost />} />
         <Route path="like" element={<CheckCreatePost/>} />
-      </Route>
+
+        {/* Test */}
+        <Route path="tets" element={<BlockchainSocial/>} />
+     </Route>
     </Routes>
   );
 }

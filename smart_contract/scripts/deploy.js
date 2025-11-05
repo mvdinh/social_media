@@ -17,7 +17,7 @@ async function main() {
 
   // 📂 Đường dẫn tuyệt đối đến client/src/config
   // Vì client và smart_contract nằm song song, cần "..", ".."
-  const configDir = path.join(__dirname, "..", "..", "client", "src", "config");
+  const configDir = path.join(__dirname, "..", "..", "backend","src", "config");
 
   // 🔧 Tạo thư mục nếu chưa tồn tại
   if (!fs.existsSync(configDir)) {

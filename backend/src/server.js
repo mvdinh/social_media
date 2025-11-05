@@ -15,6 +15,9 @@ import postRoutes from './routes/post.js';
 import deletedbRoutes from './routes/deletedb.js';
 import getPostRoutes from './routes/getPost.js';
 import ipfsProxyRoutes from './routes/ipfsProxy.js';
+import likeRoutes from './routes/like.js';
+import commentRoutes from './routes/comment.js';
+import shareRoutes from './routes/share.js';
 
 dotenv.config();
 
@@ -68,6 +71,9 @@ app.use('/api/post', postRoutes);
 app.use('/api/', getPostRoutes);  // Get posts
 app.use('/api/admin', deletedbRoutes); // Clear DB (dev only)
 app.use('/api/ipfsProxy', ipfsProxyRoutes); // Clear DB (dev only)
+app.use('/api/likes', likeRoutes);      // Like/Unlike posts
+app.use('/api/comments', commentRoutes); // Add/Delete comments
+app.use('/api/shares', shareRoutes); // Add/Delete comments
 // Health check
 app.get('/health', (req, res) => {
   res.json({ 
