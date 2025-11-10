@@ -4,7 +4,7 @@ const { Schema } = mongoose;
 
 const ConversationSchema = new Schema({
     type: { type: String, enum: ['dm', 'group'], default: 'dm' },
-    participants: [{ type: Schema.Types.ObjectId, ref: 'User', index: true }],
+    participants: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     lastMessageAt: { type: Date, index: true },
     lastMessage: {
         textPreview: String,

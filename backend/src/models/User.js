@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
     lowercase: true,
-    index: true,
+
     validate: {
       validator: v => /^0x[a-fA-F0-9]{40}$/.test(v),
       message: 'Invalid Ethereum address format'

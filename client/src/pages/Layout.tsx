@@ -40,33 +40,30 @@ const Layout = () => {
       <div
         className={`fixed right-0 top-12 w-96 h-[500px] 
               bg-white shadow-2xl border border-gray-200 rounded-xl z-50
-              origin-top-right transition-all duration-300 ${
-                isChatListOpen
-                  ? "opacity-100 scale-100"
-                  : "opacity-0 scale-95 pointer-events-none"
-              }`}
+              origin-top-right transition-all duration-300 ${isChatListOpen
+            ? "opacity-100 scale-100"
+            : "opacity-0 scale-95 pointer-events-none"
+          }`}
       >
         <Message onChatSelect={handleChatSelect} />
       </div>
       <div
         className={`fixed right-0 top-12 w-96 h-[500px] 
               bg-white shadow-2xl border border-gray-200 rounded-xl z-50
-              origin-top-right transition-all duration-300 ${
-                isNotification
-                  ? "opacity-100 scale-100"
-                  : "opacity-0 scale-95 pointer-events-none"
-              }`}
+              origin-top-right transition-all duration-300 ${isNotification
+            ? "opacity-100 scale-100"
+            : "opacity-0 scale-95 pointer-events-none"
+          }`}
       >
         <NotificationPanel onNotification={handleNotification} />
       </div>
       <div
         className={`fixed right-0 top-12 w-96 h-[500px] 
               bg-white shadow-2xl border border-gray-200 rounded-xl z-50
-              origin-top-right transition-all duration-300 ${
-                isUser
-                  ? "opacity-100 scale-100"
-                  : "opacity-0 scale-95 pointer-events-none"
-              }`}
+              origin-top-right transition-all duration-300 ${isUser
+            ? "opacity-100 scale-100"
+            : "opacity-0 scale-95 pointer-events-none"
+          }`}
       >
         <UserMenuDropdown user={dummyFollowersData} />
       </div>

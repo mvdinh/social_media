@@ -23,7 +23,7 @@ const refreshTokenSchema = new mongoose.Schema({
   expiresAt: {
     type: Date,
     required: true,
-    index: true
+
   },
   isRevoked: {
     type: Boolean,
@@ -49,11 +49,11 @@ refreshTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 refreshTokenSchema.index({ userId: 1, isRevoked: 1 });
 
 // Methods
-refreshTokenSchema.methods.isValid = function() {
+refreshTokenSchema.methods.isValid = function () {
   return !this.isRevoked && new Date() < this.expiresAt;
 };
 
-refreshTokenSchema.methods.revoke = function() {
+refreshTokenSchema.methods.revoke = function () {
   this.isRevoked = true;
 };
 

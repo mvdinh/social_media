@@ -14,10 +14,15 @@ import GetAllPost from "./pages/GetAllPost";
 import ChatPage from "./pages/chat/ChatPage";
 
 export default function App() {
+  const wallet = JSON.parse(localStorage.getItem("wallet") || "{}");
+
   const me = {
-    address: localStorage.getItem("walletAddress") || "",
-    userId: localStorage.getItem("userId") || "",
+    address: wallet.address || "",
+    userId: wallet.userId || "",
   };
+
+
+
 
   return (
     <Routes>

@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import Post from "../models/Post.js";
+import config from "../config/env.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,10 +20,8 @@ const contractAddress = JSON.parse(
 );
 
 // === Blockchain Config ===
-const RPC_URL = process.env.RPC_URL || "http://127.0.0.1:8545"; // local Hardhat node
-const PRIVATE_KEY =
-  process.env.PRIVATE_KEY ||
-  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"; // ⚠️ Private key của Hardhat node
+const RPC_URL = config.blockchain.rpcUrl;
+const PRIVATE_KEY = config.blockchain.privateKey;
 
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const signer = new ethers.Wallet(PRIVATE_KEY, provider);
@@ -109,10 +108,10 @@ router.get('/', async (req, res) => {
   const posts = await Post.find().sort({ createdAt: -1 }).limit(20);
   const total = await Post.countDocuments();
 
-    res.json({
-      total,
-      posts
-    });
+  res.json({
+    total,
+    posts
+  });
 });
 
 router.get('/:id/verify', async (req, res) => {

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Wallet, Loader2 } from 'lucide-react';
-import { connect } from 'http2';
-import { connectWallet } from '../../helper/ConnectWallet'; // Giả sử bạn có hàm này để kết nối ví
+import { connectWallet } from '../../helper/ConnectWallet';
 import { useNavigate } from 'react-router-dom';
 const Login = () => {
   const [loading, setLoading] = useState(false);
@@ -18,15 +17,17 @@ const Login = () => {
     try {
       // ✅ AWAIT connectWallet
       const wallet = await connectWallet();
-      
+
       // Kiểm tra kết nối thành công
       if (wallet && wallet.account) {
         localStorage.setItem("wallet", JSON.stringify({
-          account: wallet.account,
+          address: wallet.account,
+
         }));
-        
+        localStorage.setItem("walletAddress", wallet.account);
+
         console.log('✅ Wallet connected, navigating to /feed');
-        
+
         // ✅ Dùng navigate() đúng cách
         navigate('/feed');
       } else {
@@ -34,7 +35,7 @@ const Login = () => {
       }
     } catch (error: any) {
       console.error('Connection failed:', error);
-      
+
       if (error.code === -32002) {
         setError('Please check MetaMask popup and approve the connection request.');
       } else if (error.code === 4001) {

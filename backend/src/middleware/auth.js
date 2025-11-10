@@ -20,10 +20,10 @@ export const authMiddleware = async (req, res, next) => {
     const normalizedAddress = address.toLowerCase();
 
     // Find user
-    const user = await User.findOne({ address: normalizedAddress });
+    let user = await User.findOne({ address: normalizedAddress });
 
     if (!user) {
-      return res.status(401).json({ error: 'User not found' });
+      user = await User.create({ address: normalizedAddress, messagingPublicKey: '' });
     }
 
     // Attach user info to request
@@ -49,7 +49,7 @@ export const optionalAuth = async (req, res, next) => {
     if (address && ethers.isAddress(address)) {
       const normalizedAddress = address.toLowerCase();
       const user = await User.findOne({ address: normalizedAddress });
-      
+
       if (user) {
         req.userId = user._id;
         req.userAddress = user.address;

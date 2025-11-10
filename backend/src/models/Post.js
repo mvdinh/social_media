@@ -5,13 +5,13 @@ const postSchema = new mongoose.Schema({
     type: Number,
     required: true,
     unique: true,
-    index: true
+
   },
   author: {
     type: String,
     required: true,
     lowercase: true,
-    index: true
+
   },
   contentHash: {
     type: String,
