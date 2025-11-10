@@ -1,63 +1,66 @@
 import { useState } from 'react';
 import { Wallet, Loader2 } from 'lucide-react';
-import { connect } from 'http2';
-import { connectWallet } from '../../helper/ConnectWallet'; // Giả sử bạn có hàm này để kết nối ví
+import { contractHelper } from '../../helper/contractHelper';
+import { useDispatch } from 'react-redux';
+import { setUser, setContract } from '../../redux/appSlice';
+import { AppDispatch } from '../../redux/store';
 import { useNavigate } from 'react-router-dom';
+
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
   const handleConnect = async () => {
-    // Ngăn double click
     if (loading) return;
-
     setLoading(true);
     setError('');
 
     try {
-      // ✅ AWAIT connectWallet
-      const wallet = await connectWallet();
-      
-      // Kiểm tra kết nối thành công
-      if (wallet && wallet.account) {
-        localStorage.setItem("wallet", JSON.stringify({
-          account: wallet.account,
-        }));
-        
-        console.log('✅ Wallet connected, navigating to /feed');
-        
-        // ✅ Dùng navigate() đúng cách
-        navigate('/feed');
-      } else {
-        setError('Failed to connect wallet. Please try again.');
+      const result = await contractHelper();
+
+      if (!result || !result.user || !result.contract) {
+        throw new Error('Wallet connection failed. No user or contract returned.');
       }
-    } catch (error: any) {
-      console.error('Connection failed:', error);
-      
-      if (error.code === -32002) {
-        setError('Please check MetaMask popup and approve the connection request.');
-      } else if (error.code === 4001) {
+
+      const { user, contract } = result;
+
+      // Lưu vào Redux
+      dispatch(setUser(user));
+      dispatch(setContract(contract));
+
+      console.log('✅ Wallet connected:', user);
+      console.log('✅ Contract instance:', contract);
+
+      navigate('/feed');
+    } catch (err: any) {
+      console.error('Connection failed:', err);
+
+      if (err?.message?.includes('MetaMask')) {
+        setError('Please install MetaMask extension.');
+      } else if (err?.code === -32002) {
+        setError('Please approve the connection request in MetaMask.');
+      } else if (err?.code === 4001) {
         setError('Connection rejected by user.');
       } else {
-        setError('Failed to connect wallet. Please try again.');
+        setError(err?.message || 'Failed to connect wallet. Please try again.');
       }
     } finally {
       setLoading(false);
     }
   };
+
   return (
     <div className="relative min-h-screen flex items-center">
       <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 -z-10"></div>
 
       <div className="w-full max-w-7xl mx-auto px-4 py-8">
-        <div className="absolute top-6 left-6 md:top-10 md:left-10">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">P</span>
-            </div>
-            <span className="text-2xl font-bold text-gray-800">Pingup</span>
+        <div className="absolute top-6 left-6 md:top-10 md:left-10 flex items-center gap-2">
+          <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-xl">P</span>
           </div>
+          <span className="text-2xl font-bold text-gray-800">Pingup</span>
         </div>
 
         <div className="grid md:grid-cols-2 gap-12 items-center mt-20 md:mt-0">
@@ -69,7 +72,7 @@ const Login = () => {
               </span>
             </h1>
             <p className="text-lg text-gray-600 mb-8">
-              Connect with global community on Pingup using Web3 technology.
+              Connect with the global community on Pingup using Web3 technology.
             </p>
           </div>
 
@@ -82,6 +85,8 @@ const Login = () => {
                 <h2 className="text-3xl font-bold text-gray-800 mb-2">Sign In</h2>
                 <p className="text-gray-600">Connect your wallet to continue</p>
               </div>
+
+              {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
 
               <button
                 onClick={handleConnect}

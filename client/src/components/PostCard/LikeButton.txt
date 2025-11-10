@@ -1,0 +1,48 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Heart,
+  MessageCircle,
+  Share2,
+  MoreHorizontal,
+  CheckCircle,
+  Send,
+} from "lucide-react";
+
+// Component nút Like
+const LikeButton = ({ postId, countLikes, isLiked, user, contract }) => {
+  const [likes, setLikes] = useState(countLikes);
+  const [liked, setLiked] = useState(isLiked);
+  const [loading, setLoading] = useState(false);
+
+  const handleLike = async () => {
+    if (loading) return;
+    
+    setLoading(true);
+    try {
+      // Call API toggle like
+      const response = await axios.post(`/api/posts/${postId}/like`, {
+        
+      });
+      const data = await response.json();
+      
+      setLiked(data.liked);
+      setLikes(data.total_likes);
+    } catch (error) {
+      console.error('Error liking post:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className={`flex items-center space-x-1 cursor-pointer transition-colors ${
+        liked ? "text-red-500" : "hover:text-red-500"
+      } ${loading ? 'opacity-50' : ''}`}
+      onClick={handleLike}
+    >
+      <Heart className={`w-5 h-5 ${liked ? "fill-red-500" : ""}`} />
+      <span>{likes}</span>
+    </div>
+  );
+};

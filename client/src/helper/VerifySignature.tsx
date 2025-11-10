@@ -38,12 +38,12 @@ export const verifySignature = async (account: string) => {
     });
 
     const { user, token } = verifyResponse.data;
-    console.log('✅ Authentication successful! User:', user.username);
+    console.log('✅ Authentication successful! User:', user, 'token:', token);
 
     // Optionally return the data
     return { user, token };
   } catch (err) {
-    console.error('❌ Signature verification failed:', err);
+    console.error(' Signature verification failed:', err);
     throw err;
   }
 };

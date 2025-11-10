@@ -1,0 +1,52 @@
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import PostCard from './PostCard/PostCard';
+import { useAppStore } from '../store/useAppStore';
+import { Post } from '../types/index'; // Giả sử file bạn lưu tên là types/index.ts
+
+const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+
+const ListPost = () => {
+  const { user, contract } = useAppStore();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const fetchPosts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await axios.get(`${API_URL}/post/`, { timeout: 10000 });
+      console.log('📥 Fetched posts:', response.data.posts);
+      setPosts(response.data.posts || []);
+    } catch (err: any) {
+      console.error('❌ Error fetching posts:', err);
+      setError('Không thể tải bài viết. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <p>Đang tải bài viết...</p>;
+  if (error) return <p>{error}</p>;
+
+  return (
+    <div className="space-y-6">
+      {posts.map((post) => (
+        <PostCard
+          key={post._id || post.postId}
+          post={post}
+          user={user}
+          contract={contract}
+        />
+      ))}
+    </div>
+  );
+};
+
+export default ListPost;

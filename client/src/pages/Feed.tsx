@@ -13,6 +13,7 @@ import {
   dummyPostsData,
   dummyRecentMessagesData,
 } from "../assets/assets";
+import ListPosts from "../Test/ListPosts";
 
 // -----------------------------------------------------------------
 // 1. Story Card
@@ -60,7 +61,6 @@ const StoryCard = ({ user, media_url, isCurrentUser = false }) => {
 // -----------------------------------------------------------------
 // 2. Post Card
 // -----------------------------------------------------------------
-
 // -----------------------------------------------------------------
 // 3. Right Sidebar
 // -----------------------------------------------------------------
@@ -132,7 +132,8 @@ const Feed = () => {
           </div>
 
           {/* Posts */}
-          
+          <ListPosts/>
+        
         </div>
 
        {/* Right Sidebar */}

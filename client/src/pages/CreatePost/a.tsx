@@ -1,4 +1,4 @@
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import axios from 'axios';
 import { Image, X, Loader2, Shield } from 'lucide-react';
@@ -17,20 +17,23 @@ const CreatePost = () => {
   const [content, setContent] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [posting, setPosting] = useState(false);
+  const [postingStep, setPostingStep] = useState('');
   const [previews, setPreviews] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Fetch posts on mount
   useEffect(() => {
-    //get all post
     const fetchPosts = async () => {
       try {
-        const response = await axios.get(`${API_URL}/post/posts`);
-        console.log('Fetched posts:', response.data);
+        const response = await axios.get(`${API_URL}/post`);
+        console.log('📥 Fetched posts:', response.data);
       } catch (error) {
-        console.error('Error fetching posts:', error);
+        console.error('❌ Error fetching posts:', error);
       }
     };
-  })
+
+    fetchPosts();
+  }, []);
 
   // Initialize contract on mount
   useEffect(() => {
@@ -70,7 +73,6 @@ const CreatePost = () => {
       setContract(socialMediaContract);
       setAccount(accounts[0]);
       console.log('✅ Connected:', accounts[0]);
-      console.log('📄 Contract initialized:', contract);
     } catch (error) {
       console.error('❌ Init error:', error);
       alert('Failed to connect wallet');
@@ -100,202 +102,169 @@ const CreatePost = () => {
   };
 
   const createPost = async () => {
-  if (!contract || !content.trim()) {
-    alert('Please write something!');
-    return;
-  }
-
-  try {
-    setPosting(true);
-
-    // STEP 3: Verify user signature
-    const { user, token } = await verifySignature(account);
-    console.log('User verified:', user, token);
-
-    // STEP 4–5: Upload to IPFS
-    const { contentHash, mediaHashes } = await uploadToIpfs(content, account, files);
-
-    // STEP 6: Create post on blockchain
-    
-  let tx;
-  try {
-    console.log("🚀 Creating post...");
-    // Gọi hàm Solidity
-    tx =
-      mediaHashes.length > 0
-        ? await contract.createPostWithMedia(contentHash, mediaHashes, 1) // 1 = IMAGE
-        : await contract.createPost(contentHash);
-  } catch (error: any) {
-    if (error.code === "ACTION_REJECTED" || error.code === 4001) {
-      throw new Error("❌ You rejected the transaction.");
+    if (!contract || !content.trim()) {
+      alert('Please write something!');
+      return;
     }
-    console.error("🚨 Transaction failed:", error);
-    throw error;
-  }
 
-  console.log("⏳ Waiting for transaction confirmation...");
-  const receipt = await tx.wait();
-  console.log("✅ Transaction confirmed! Hash:", receipt.hash);
+    try {
+      setPosting(true);
 
-  // ✅ Lấy event PostCreated từ receipt.logs
-  const eventTopic = contract.interface.getEvent("PostCreated").topicHash;
-  const log = receipt.logs.find((l) => l.topics[0] === eventTopic);
-
-  let postId;
-  if (log) {
-    const parsed = contract.interface.parseLog(log);
-    postId = parsed.args.postId.toString();
-    console.log("📝 Post ID:", postId);
-  } else {
-    console.warn("⚠️ Không tìm thấy event PostCreated trong logs.");
-  }
-
-    // STEP 8: Sync to backend
-  if (postId) {
-  console.log('🔄 Step 8: Syncing to backend...');
-  
-  try {
-    const response = await axios.post(
-      `${API_URL}/post/post/${postId}`,
-      {
-        txHash: receipt.hash
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000 // 10 seconds timeout
-      }
-    );
-    
-    if (response && response.data) {
-      console.log('✅ Post synced to backend:', response.data);
-      alert(`✅ Post created successfully!\n\nPost ID: ${postId}\nTx: ${receipt.hash}`);
-      setTimeout(() => window.location.reload(), 1500);
-    } else {
-      console.warn('⚠️ Empty response from backend');
-    }
-    
-  } catch (syncError) {
-    console.error('❌ Failed to sync to backend:', syncError);
-    
-    // Xử lý lỗi Axios
-    if (axios.isAxiosError(syncError)) {
-      const { response, request, code } = syncError;
+      // === STEP 1: Verify user with nonce signature ===
+      setPostingStep('Check MetaMask for authentication...');
+      console.log('🔐 Step 1: Authenticating user...');
       
-      // Lỗi từ server (có response)
-      if (response) {
-        console.error('📡 Server Error Details:');
-        console.error('- Status:', response.status);
-        console.error('- Status Text:', response.statusText);
-        console.error('- Data:', response.data);
-        console.error('- Headers:', response.headers);
-        
-        switch (response.status) {
-          case 400:
-            console.error('❌ Bad Request: Invalid data sent to server');
-            break;
-          case 401:
-            console.error('❌ Unauthorized: Authentication required');
-            break;
-          case 403:
-            console.error('❌ Forbidden: No permission to sync');
-            break;
-          case 404:
-            console.error('❌ Not Found: Sync endpoint not available');
-            break;
-          case 409:
-            console.error('⚠️ Conflict: Post may already be synced');
-            break;
-          case 500:
-            console.error('❌ Internal Server Error');
-            break;
-          case 502:
-            console.error('❌ Bad Gateway: Server is down or unreachable');
-            break;
-          case 503:
-            console.error('❌ Service Unavailable: Server temporarily down');
-            break;
-          case 504:
-            console.error('❌ Gateway Timeout: Server took too long to respond');
-            break;
-          default:
-            console.error(`❌ Unexpected status code: ${response.status}`);
-        }
-      } 
-      // Request được gửi nhưng không nhận được response
-      else if (request) {
-        console.error('📡 Network Error Details:');
-        console.error('- Request was made but no response received');
-        console.error('- Request:', request);
-        
-        if (code === 'ECONNABORTED') {
-          console.error('⏱️ Request Timeout: Server took longer than 10 seconds');
-        } else if (code === 'ERR_NETWORK') {
-          console.error('🌐 Network Error: Check your internet connection');
-        } else if (code === 'ERR_CONNECTION_REFUSED') {
-          console.error('🚫 Connection Refused: Backend server is not running');
+      // Show alert after delay
+      const authAlert = setTimeout(() => {
+        console.log('⏳ Still waiting for MetaMask signature...');
+      }, 3000);
+      
+      const { user, token } = await verifySignature(account);
+
+      clearTimeout(authAlert);
+      
+      console.log('✅ User authenticated:', user.username || user.address);
+
+      // === STEP 2: Upload to IPFS ===
+      setPostingStep('Uploading to IPFS...');
+      console.log('📤 Step 2: Uploading content to IPFS...');
+      
+      const { contentHash, mediaHashes } = await uploadToIpfs(content, account, files);
+      console.log('✅ IPFS upload complete:', { contentHash, mediaHashes });
+
+      const mediaType = mediaHashes.length > 0 ? 1 : 0; // 1 = IMAGE, 0 = TEXT_ONLY
+
+      // === STEP 3: Send transaction to blockchain ===
+      setPostingStep('Check MetaMask to confirm transaction...');
+      console.log('🔗 Step 3: Sending transaction to blockchain...');
+      console.log('⏳ Please approve the transaction in MetaMask...');
+
+      let tx;
+      try {
+        if (mediaHashes && mediaHashes.length > 0) {
+          tx = await contract.createPostWithMedia(contentHash, mediaHashes, mediaType);
         } else {
-          console.error('❌ Network Error Code:', code);
+          tx = await contract.createPost(contentHash);
         }
-      } 
-      // Lỗi khi setup request
-      else {
-        console.error('⚙️ Request Setup Error:', syncError.message);
+        
+        console.log('✅ Transaction sent:', tx.hash);
+      } catch (txError: any) {
+        if (txError.code === 'ACTION_REJECTED' || txError.code === 4001) {
+          throw new Error('You rejected the transaction');
+        }
+        throw txError;
       }
+
+      // === STEP 4: Wait for confirmation ===
+      setPostingStep('Waiting for blockchain confirmation...');
+      console.log('⏳ Waiting for transaction confirmation...');
       
-      // Log full error config
-      console.error('🔧 Request Config:', {
-        url: syncError.config?.url,
-        method: syncError.config?.method,
-        timeout: syncError.config?.timeout,
-        headers: syncError.config?.headers
-      });
-    } 
-    // Lỗi không phải từ Axios
-    else {
-      console.error('❌ Unexpected Error Type:', {
-        name: (syncError as Error).name,
-        message: (syncError as Error).message,
-        stack: (syncError as Error).stack
-      });
+      const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed in block:', receipt.blockNumber);
+
+      // === STEP 5: Send txHash to backend ===
+      setPostingStep('Saving to database...');
+      console.log('📡 Step 4: Sending transaction data to backend...');
+      
+      const postData = {
+        txHash: receipt.hash,
+        walletAddress: account,
+        contentHash,
+        mediaHashes: mediaHashes.length > 0 ? mediaHashes : undefined,
+        mediaType,
+      };
+
+      console.log('📤 Sending data to backend:', postData);
+
+      const response = await axios.post(
+        `${API_URL}/post`,
+        postData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            // Add auth token if needed
+            // 'Authorization': `Bearer ${token}`
+          },
+          timeout: 30000, // 30 seconds
+        }
+      );
+
+      console.log('✅ Backend response:', response.data);
+
+      if (response.data.success) {
+        const { blockchainPostId, txHash, dbPostId } = response.data;
+
+        // Success notification
+        alert(
+          `✅ Post created successfully!\n\n` +
+          `Post ID: ${blockchainPostId}\n` +
+          `Database ID: ${dbPostId}\n` +
+          `Transaction: ${txHash.slice(0, 10)}...${txHash.slice(-8)}`
+        );
+
+        // Reset form
+        setContent('');
+        setFiles([]);
+        setPreviews([]);
+
+        // Reload to show new post
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        throw new Error('Backend returned unsuccessful response');
+      }
+
+    } catch (error: any) {
+      console.error('❌ Error creating post:', error);
+
+      // Detailed error handling
+      if (axios.isAxiosError(error)) {
+        const { response, code } = error;
+
+        if (response) {
+          console.error('📡 Server Error:', {
+            status: response.status,
+            statusText: response.statusText,
+            data: response.data
+          });
+
+          const errorMsg = response.data?.error || response.statusText;
+          
+          switch (response.status) {
+            case 400:
+              alert(`❌ Invalid data: ${errorMsg}`);
+              break;
+            case 401:
+              alert('❌ Authentication failed. Please reconnect your wallet.');
+              break;
+            case 404:
+              alert('❌ Transaction not found on blockchain. Please try again.');
+              break;
+            case 500:
+              alert(`❌ Server error: ${errorMsg}\n\nPlease try again.`);
+              break;
+            default:
+              alert(`❌ Error (${response.status}): ${errorMsg}`);
+          }
+        } else if (code === 'ECONNABORTED') {
+          alert('⏱️ Request timeout.\n\nPlease check your post in a moment.');
+        } else if (code === 'ERR_NETWORK' || code === 'ECONNREFUSED') {
+          alert('🌐 Cannot connect to server.\n\nPlease make sure the backend is running at ' + API_URL);
+        } else {
+          alert(`❌ Network error: ${error.message}`);
+        }
+      } else if (error.code === 'INSUFFICIENT_FUNDS') {
+        alert('❌ Insufficient funds for gas fees.\n\nPlease add more ETH to your wallet.');
+      } else {
+        // Non-axios errors (from verifySignature, uploadToIpfs, or blockchain)
+        const errorMsg = error.message || 'Unknown error occurred';
+        alert(`❌ ${errorMsg}`);
+      }
+
+    } finally {
+      setPosting(false);
+      setPostingStep('');
     }
-    
-    // ⚠️ Không throw error, vì post đã được tạo trên blockchain thành công
-    console.warn('⚠️ Post created on blockchain but sync failed. It will be synced later.');
-    console.warn(`📝 Post ID: ${postId}`);
-    console.warn(`🔗 Tx Hash: ${receipt.hash}`);
-    
-    // Hiển thị warning cho user với thông tin chi tiết hơn
-    const errorMessage = axios.isAxiosError(syncError) 
-      ? syncError.response?.data?.message || syncError.message
-      : (syncError as Error).message;
-      
-    alert(
-      `⚠️ Post created on blockchain successfully but backend sync failed.\n\n` +
-      `Post ID: ${postId}\n` +
-      `Tx: ${receipt.hash}\n\n` +
-      `Error: ${errorMessage}\n\n` +
-      `Don't worry! Your post will be synced automatically later.`
-    );
-  }
-}
-
-    // // Reset
-    // setContent('');
-    // setFiles([]);
-    // setPreviews([]);
-
-    
-
-  } catch (error: any) {
-    console.error('❌ Error creating post:', error);
-    let msg = error.response?.data?.error || error.message || 'Failed to create post';
-    alert(`❌ ${msg}`);
-  } finally {
-    setPosting(false);
-  }
-};
+  };
 
   // Loading state
   if (loading) {
@@ -330,6 +299,27 @@ const CreatePost = () => {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+      {/* MetaMask Action Pending Overlay */}
+      {posting && postingStep.includes('MetaMask') && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-8 max-w-md mx-4 text-center shadow-2xl">
+            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Shield className="w-8 h-8 text-orange-600 animate-pulse" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+              MetaMask Action Required
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Please check your MetaMask extension and approve the request to continue.
+            </p>
+            <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>{postingStep}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-3">
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold shrink-0">
           {account.slice(2, 4).toUpperCase()}
@@ -413,7 +403,7 @@ const CreatePost = () => {
                 {posting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Posting...</span>
+                    <span>{postingStep || 'Posting...'}</span>
                   </>
                 ) : (
                   <>
@@ -427,13 +417,11 @@ const CreatePost = () => {
         </div>
       </div>
       
-      {/* Connected account & Test button */}
-      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+      {/* Connected account info */}
+      <div className="mt-3 pt-3 border-t border-gray-100">
         <p className="text-xs text-gray-500">
           Connected: <span className="font-mono">{account.slice(0, 6)}...{account.slice(-4)}</span>
         </p>
-        
-        
       </div>
     </div>
   );

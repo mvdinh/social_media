@@ -15,29 +15,30 @@ async function main() {
   console.log(`✅ SocialMedia deployed successfully!`);
   console.log(`📜 Contract address: ${address}`);
 
-  // 📂 Đường dẫn tuyệt đối đến client/src/config
-  // Vì client và smart_contract nằm song song, cần "..", ".."
-  const configDir = path.join(__dirname, "..", "..", "backend","src", "config");
+  // 📂 Đường dẫn tuyệt đối đến backend/src/config và client/src/config
+  const configDirBackend = path.join(__dirname, "..", "..", "backend", "src", "config");
+  const configDirClient = path.join(__dirname, "..", "..", "client", "src", "config");
 
   // 🔧 Tạo thư mục nếu chưa tồn tại
-  if (!fs.existsSync(configDir)) {
-    fs.mkdirSync(configDir, { recursive: true });
-    console.log(`📁 Created config directory: ${configDir}`);
-  }
+  [configDirBackend, configDirClient].forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`📁 Created config directory: ${dir}`);
+    }
+  });
 
   // 💾 Lưu contract address
-  const addressFile = path.join(configDir, "contract-address.json");
-  fs.writeFileSync(
-    addressFile,
-    JSON.stringify({ SocialMedia: address }, null, 2)
-  );
-  console.log(`💾 Saved contract address to: ${addressFile}`);
+  const addressData = JSON.stringify({ SocialMedia: address }, null, 2);
+  fs.writeFileSync(path.join(configDirBackend, "contract-address.json"), addressData);
+  fs.writeFileSync(path.join(configDirClient, "contract-address.json"), addressData);
+  console.log(`💾 Saved contract address to both backend & client`);
 
   // 💾 Lưu ABI
   const artifact = await hre.artifacts.readArtifact("SocialMedia");
-  const abiFile = path.join(configDir, "SocialMedia.json");
-  fs.writeFileSync(abiFile, JSON.stringify(artifact, null, 2));
-  console.log(`💾 Saved ABI to: ${abiFile}`);
+  const abiData = JSON.stringify(artifact, null, 2);
+  fs.writeFileSync(path.join(configDirBackend, "SocialMedia.json"), abiData);
+  fs.writeFileSync(path.join(configDirClient, "SocialMedia.json"), abiData);
+  console.log(`💾 Saved ABI to both backend & client`);
 
   console.log("🎉 Deployment complete!");
   console.log("\n📋 Summary:");

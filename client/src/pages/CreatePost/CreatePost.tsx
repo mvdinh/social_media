@@ -17,6 +17,7 @@ const CreatePost = () => {
   const [content, setContent] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [posting, setPosting] = useState(false);
+  const [postingStep, setPostingStep] = useState('');
   const [previews, setPreviews] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -109,25 +110,68 @@ const CreatePost = () => {
     try {
       setPosting(true);
 
-      // STEP 1: Verify user signature
-      console.log('🔐 Step 1: Verifying signature...');
+      // === STEP 1: Verify user with nonce signature ===
+      setPostingStep('Check MetaMask for authentication...');
+      console.log('🔐 Step 1: Authenticating user...');
+      
+      // Show alert after delay
+      const authAlert = setTimeout(() => {
+        console.log('⏳ Still waiting for MetaMask signature...');
+      }, 3000);
+      
       const { user, token } = await verifySignature(account);
-      console.log('✅ User verified:', user);
 
-      // STEP 2: Upload to IPFS
-      console.log('📤 Step 2: Uploading to IPFS...');
+      clearTimeout(authAlert);
+      
+      console.log('✅ User authenticated:', user.username || user.address);
+
+      // === STEP 2: Upload to IPFS ===
+      setPostingStep('Uploading to IPFS...');
+      console.log('📤 Step 2: Uploading content to IPFS...');
+      
       const { contentHash, mediaHashes } = await uploadToIpfs(content, account, files);
       console.log('✅ IPFS upload complete:', { contentHash, mediaHashes });
 
-      // STEP 3: Call backend API để tạo post
-      // Backend sẽ tự động tạo transaction trên blockchain và lưu vào DB
-      console.log('🔄 Step 3: Creating post via backend API...');
+      const mediaType = mediaHashes.length > 0 ? 1 : 0; // 1 = IMAGE, 0 = TEXT_ONLY
+
+      // === STEP 3: Send transaction to blockchain ===
+      setPostingStep('Check MetaMask to confirm transaction...');
+      console.log('🔗 Step 3: Sending transaction to blockchain...');
+      console.log('⏳ Please approve the transaction in MetaMask...');
+
+      let tx;
+      try {
+        if (mediaHashes && mediaHashes.length > 0) {
+          tx = await contract.createPostWithMedia(contentHash, mediaHashes, mediaType);
+        } else {
+          tx = await contract.createPost(contentHash);
+        }
+        
+        console.log('✅ Transaction sent:', tx.hash);
+      } catch (txError: any) {
+        if (txError.code === 'ACTION_REJECTED' || txError.code === 4001) {
+          throw new Error('You rejected the transaction');
+        }
+        throw txError;
+      }
+
+      // === STEP 4: Wait for confirmation ===
+      setPostingStep('Waiting for blockchain confirmation...');
+      console.log('⏳ Waiting for transaction confirmation...');
+      
+      const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed in block:', receipt.blockNumber);
+
+      // === STEP 5: Send txHash to backend ===
+      setPostingStep('Saving to database...');
+      console.log('📡 Step 4: Sending transaction data to backend...');
       
       const postData = {
+        txHash: receipt.hash,
+        walletAddress: account,
         contentHash,
         mediaHashes: mediaHashes.length > 0 ? mediaHashes : undefined,
-        mediaType: mediaHashes.length > 0 ? 1 : 0, // 1 = IMAGE, 0 = TEXT_ONLY
-        walletAddress: account
+        mediaType,
       };
 
       console.log('📤 Sending data to backend:', postData);
@@ -135,7 +179,14 @@ const CreatePost = () => {
       const response = await axios.post(
         `${API_URL}/post`,
         postData,
-        
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            // Add auth token if needed
+            // 'Authorization': `Bearer ${token}`
+          },
+          timeout: 30000, // 30 seconds
+        }
       );
 
       console.log('✅ Backend response:', response.data);
@@ -185,6 +236,9 @@ const CreatePost = () => {
             case 401:
               alert('❌ Authentication failed. Please reconnect your wallet.');
               break;
+            case 404:
+              alert('❌ Transaction not found on blockchain. Please try again.');
+              break;
             case 500:
               alert(`❌ Server error: ${errorMsg}\n\nPlease try again.`);
               break;
@@ -192,20 +246,23 @@ const CreatePost = () => {
               alert(`❌ Error (${response.status}): ${errorMsg}`);
           }
         } else if (code === 'ECONNABORTED') {
-          alert('⏱️ Request timeout. The blockchain transaction may take longer.\n\nPlease check your post in a moment.');
+          alert('⏱️ Request timeout.\n\nPlease check your post in a moment.');
         } else if (code === 'ERR_NETWORK' || code === 'ECONNREFUSED') {
           alert('🌐 Cannot connect to server.\n\nPlease make sure the backend is running at ' + API_URL);
         } else {
           alert(`❌ Network error: ${error.message}`);
         }
+      } else if (error.code === 'INSUFFICIENT_FUNDS') {
+        alert('❌ Insufficient funds for gas fees.\n\nPlease add more ETH to your wallet.');
       } else {
-        // Non-axios errors (e.g., from verifySignature or uploadToIpfs)
+        // Non-axios errors (from verifySignature, uploadToIpfs, or blockchain)
         const errorMsg = error.message || 'Unknown error occurred';
         alert(`❌ ${errorMsg}`);
       }
 
     } finally {
       setPosting(false);
+      setPostingStep('');
     }
   };
 
@@ -242,6 +299,27 @@ const CreatePost = () => {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+      {/* MetaMask Action Pending Overlay */}
+      {posting && postingStep.includes('MetaMask') && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-8 max-w-md mx-4 text-center shadow-2xl">
+            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Shield className="w-8 h-8 text-orange-600 animate-pulse" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+              MetaMask Action Required
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Please check your MetaMask extension and approve the request to continue.
+            </p>
+            <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>{postingStep}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-3">
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold shrink-0">
           {account.slice(2, 4).toUpperCase()}
@@ -325,7 +403,7 @@ const CreatePost = () => {
                 {posting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Posting...</span>
+                    <span>{postingStep || 'Posting...'}</span>
                   </>
                 ) : (
                   <>

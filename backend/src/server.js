@@ -19,6 +19,9 @@ import likeRoutes from './routes/like.js';
 import commentRoutes from './routes/comment.js';
 import shareRoutes from './routes/share.js';
 
+
+
+import getIPFSRoutes from './routes/getIFPS.js'
 dotenv.config();
 
 const app = express();
@@ -29,7 +32,7 @@ const PORT = process.env.PORT || 5000;
 // ===============================================
 app.use(helmet());
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000'], // Vite default port
+  origin: ['http://localhost:5173', 'http://localhost:5174'], // Vite default port
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -74,6 +77,11 @@ app.use('/api/ipfsProxy', ipfsProxyRoutes); // Clear DB (dev only)
 app.use('/api/likes', likeRoutes);      // Like/Unlike posts
 app.use('/api/comments', commentRoutes); // Add/Delete comments
 app.use('/api/shares', shareRoutes); // Add/Delete comments
+
+app.use('/api/getIPFS/', getIPFSRoutes)
+
+
+app
 // Health check
 app.get('/health', (req, res) => {
   res.json({ 

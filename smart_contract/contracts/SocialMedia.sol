@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-
-contract SocialMedia is ERC721 {
-    // Thay thế Counters bằng uint256
-    uint256 private _nextTokenId;
-
+/**
+ * @title SocialMedia
+ * @dev Simplified social media contract WITHOUT OpenZeppelin dependencies
+ * @notice Bỏ NFT feature để tránh lỗi import OpenZeppelin
+ */
+contract SocialMedia {
     enum MediaType {
         TEXT,
         IMAGE,
@@ -17,27 +17,27 @@ contract SocialMedia is ERC721 {
     struct Post {
         uint256 id;
         address author;
-        string contentHash; // IPFS hash cho text content
-        string[] mediaHashes; // IPFS hashes cho images/videos
+        string contentHash;
+        string[] mediaHashes;
         MediaType mediaType;
         uint256 timestamp;
         uint256 likes;
         uint256 shares;
-        uint256 nftTokenId; // NFT token ID nếu post được mint thành NFT
-        bool isNFT; // Post có phải NFT không
+        bool isDeleted;
     }
 
     struct Comment {
         address author;
         string contentHash;
-        string mediaHash; // Optional: IPFS hash cho media trong comment
+        string mediaHash;
         uint256 timestamp;
+        bool isDeleted;
     }
 
     mapping(uint256 => Post) public posts;
     mapping(uint256 => mapping(address => bool)) public hasLiked;
     mapping(uint256 => Comment[]) public postComments;
-    mapping(uint256 => string) private _tokenURIs; // NFT metadata
+    mapping(uint256 => address[]) public postShares;
 
     uint256 public postCount;
 
@@ -47,6 +47,7 @@ contract SocialMedia is ERC721 {
         string contentHash,
         MediaType mediaType
     );
+    event PostDeleted(uint256 indexed postId, address indexed author);
     event PostLiked(uint256 indexed postId, address indexed user);
     event PostUnliked(uint256 indexed postId, address indexed user);
     event PostShared(uint256 indexed postId, address indexed user);
@@ -55,18 +56,22 @@ contract SocialMedia is ERC721 {
         address indexed author,
         string contentHash
     );
-    event PostMintedAsNFT(
+    event CommentDeleted(
         uint256 indexed postId,
-        uint256 indexed tokenId,
-        address indexed owner
+        uint256 commentIndex,
+        address indexed author
     );
 
-    constructor() ERC721("SocialMediaNFT", "SMNFT") {
-        _nextTokenId = 1; // Bắt đầu từ token ID 1
+    modifier postExists(uint256 _postId) {
+        require(_postId > 0 && _postId <= postCount, "Post does not exist");
+        require(!posts[_postId].isDeleted, "Post has been deleted");
+        _;
     }
 
     // Create text-only post
     function createPost(string memory _contentHash) public returns (uint256) {
+        require(bytes(_contentHash).length > 0, "Content hash cannot be empty");
+
         postCount++;
         string[] memory emptyMedia;
 
@@ -79,15 +84,14 @@ contract SocialMedia is ERC721 {
             timestamp: block.timestamp,
             likes: 0,
             shares: 0,
-            nftTokenId: 0,
-            isNFT: false
+            isDeleted: false
         });
 
         emit PostCreated(postCount, msg.sender, _contentHash, MediaType.TEXT);
         return postCount;
     }
 
-    // Create post with media (images/videos)
+    // Create post with media
     function createPostWithMedia(
         string memory _contentHash,
         string[] memory _mediaHashes,
@@ -112,47 +116,25 @@ contract SocialMedia is ERC721 {
             timestamp: block.timestamp,
             likes: 0,
             shares: 0,
-            nftTokenId: 0,
-            isNFT: false
+            isDeleted: false
         });
 
         emit PostCreated(postCount, msg.sender, _contentHash, _mediaType);
         return postCount;
     }
 
-    // Mint post as NFT
-    function mintPostAsNFT(uint256 _postId) public returns (uint256) {
-        require(_postId > 0 && _postId <= postCount, "Post does not exist");
-        require(posts[_postId].author == msg.sender, "Only author can mint");
-        require(!posts[_postId].isNFT, "Already minted as NFT");
+    // Delete post
+    function deletePost(uint256 _postId) public postExists(_postId) {
+        require(posts[_postId].author == msg.sender, "Only author can delete");
 
-        uint256 newTokenId = _nextTokenId;
-        _nextTokenId++; // Increment token ID
+        posts[_postId].isDeleted = true;
 
-        _mint(msg.sender, newTokenId);
-
-        // Set NFT metadata (IPFS hash)
-        _tokenURIs[newTokenId] = posts[_postId].contentHash;
-
-        // Update post
-        posts[_postId].nftTokenId = newTokenId;
-        posts[_postId].isNFT = true;
-
-        emit PostMintedAsNFT(_postId, newTokenId, msg.sender);
-        return newTokenId;
+        emit PostDeleted(_postId, msg.sender);
     }
 
-    // Get NFT metadata URI
-    function tokenURI(
-        uint256 tokenId
-    ) public view override returns (string memory) {
-        require(ownerOf(tokenId) != address(0), "Token does not exist");
-        return string(abi.encodePacked("ipfs://", _tokenURIs[tokenId]));
-    }
-
-    function likePost(uint256 _postId) public {
-        require(_postId > 0 && _postId <= postCount, "Post does not exist");
-        require(!hasLiked[_postId][msg.sender], "Already liked");
+    // Like post
+    function likePost(uint256 _postId) public postExists(_postId) {
+        require(!hasLiked[_postId][msg.sender], "Already liked this post");
 
         posts[_postId].likes++;
         hasLiked[_postId][msg.sender] = true;
@@ -160,9 +142,9 @@ contract SocialMedia is ERC721 {
         emit PostLiked(_postId, msg.sender);
     }
 
-    function unlikePost(uint256 _postId) public {
-        require(_postId > 0 && _postId <= postCount, "Post does not exist");
-        require(hasLiked[_postId][msg.sender], "Not liked yet");
+    // Unlike post
+    function unlikePost(uint256 _postId) public postExists(_postId) {
+        require(hasLiked[_postId][msg.sender], "You haven't liked this post");
 
         posts[_postId].likes--;
         hasLiked[_postId][msg.sender] = false;
@@ -170,33 +152,28 @@ contract SocialMedia is ERC721 {
         emit PostUnliked(_postId, msg.sender);
     }
 
-    mapping(uint256 => address[]) public postShares;
-
-    function sharePost(uint256 _postId) public {
-        require(_postId > 0 && _postId <= postCount, "Post does not exist");
-
+    // Share post
+    function sharePost(uint256 _postId) public postExists(_postId) {
         posts[_postId].shares++;
         postShares[_postId].push(msg.sender);
 
         emit PostShared(_postId, msg.sender);
     }
-    function getPostShares(
-        uint256 _postId
-    ) public view returns (address[] memory) {
-        require(_postId > 0 && _postId <= postCount, "Post does not exist");
-        return postShares[_postId];
-    }
 
-    // Add text comment
-    function addComment(uint256 _postId, string memory _contentHash) public {
-        require(_postId > 0 && _postId <= postCount, "Post does not exist");
+    // Add comment
+    function addComment(
+        uint256 _postId,
+        string memory _contentHash
+    ) public postExists(_postId) {
+        require(bytes(_contentHash).length > 0, "Comment cannot be empty");
 
         postComments[_postId].push(
             Comment({
                 author: msg.sender,
                 contentHash: _contentHash,
                 mediaHash: "",
-                timestamp: block.timestamp
+                timestamp: block.timestamp,
+                isDeleted: false
             })
         );
 
@@ -208,66 +185,136 @@ contract SocialMedia is ERC721 {
         uint256 _postId,
         string memory _contentHash,
         string memory _mediaHash
-    ) public {
-        require(_postId > 0 && _postId <= postCount, "Post does not exist");
-
+    ) public postExists(_postId) {
         postComments[_postId].push(
             Comment({
                 author: msg.sender,
                 contentHash: _contentHash,
                 mediaHash: _mediaHash,
-                timestamp: block.timestamp
+                timestamp: block.timestamp,
+                isDeleted: false
             })
         );
 
         emit CommentAdded(_postId, msg.sender, _contentHash);
     }
 
+    // Delete comment
+    function deleteComment(
+        uint256 _postId,
+        uint256 _commentIndex
+    ) public postExists(_postId) {
+        require(
+            _commentIndex < postComments[_postId].length,
+            "Comment does not exist"
+        );
+        require(
+            postComments[_postId][_commentIndex].author == msg.sender,
+            "Only author can delete comment"
+        );
+        require(
+            !postComments[_postId][_commentIndex].isDeleted,
+            "Comment already deleted"
+        );
+
+        postComments[_postId][_commentIndex].isDeleted = true;
+
+        emit CommentDeleted(_postId, _commentIndex, msg.sender);
+    }
+
+    // ========== VIEW FUNCTIONS ==========
+
     function getPost(uint256 _postId) public view returns (Post memory) {
+        require(_postId > 0 && _postId <= postCount, "Post does not exist");
         return posts[_postId];
     }
 
     function getPostMediaHashes(
         uint256 _postId
-    ) public view returns (string[] memory) {
+    ) public view postExists(_postId) returns (string[] memory) {
         return posts[_postId].mediaHashes;
     }
 
     function getComments(
         uint256 _postId
     ) public view returns (Comment[] memory) {
+        require(_postId > 0 && _postId <= postCount, "Post does not exist");
         return postComments[_postId];
     }
 
-    function getUserLiked(
+    function checkIfLiked(
         uint256 _postId,
         address _user
     ) public view returns (bool) {
+        require(_postId > 0 && _postId <= postCount, "Post does not exist");
         return hasLiked[_postId][_user];
     }
 
-    function getMediaType(uint256 _postId) public view returns (MediaType) {
+    function getPostShares(
+        uint256 _postId
+    ) public view returns (address[] memory) {
+        require(_postId > 0 && _postId <= postCount, "Post does not exist");
+        return postShares[_postId];
+    }
+
+    function getMediaType(
+        uint256 _postId
+    ) public view postExists(_postId) returns (MediaType) {
         return posts[_postId].mediaType;
     }
 
-    // Check if post is NFT
-    function isPostNFT(uint256 _postId) public view returns (bool) {
-        return posts[_postId].isNFT;
+    // Get posts with pagination
+    function getPosts(
+        uint256 _offset,
+        uint256 _limit
+    ) public view returns (Post[] memory) {
+        require(_offset < postCount, "Offset out of bounds");
+
+        uint256 end = _offset + _limit;
+        if (end > postCount) {
+            end = postCount;
+        }
+
+        uint256 resultCount = 0;
+        for (uint256 i = _offset + 1; i <= end; i++) {
+            if (!posts[i].isDeleted) {
+                resultCount++;
+            }
+        }
+
+        Post[] memory result = new Post[](resultCount);
+        uint256 index = 0;
+
+        for (uint256 i = _offset + 1; i <= end; i++) {
+            if (!posts[i].isDeleted) {
+                result[index] = posts[i];
+                index++;
+            }
+        }
+
+        return result;
     }
 
-    // Get NFT token ID of post
-    function getPostNFTTokenId(uint256 _postId) public view returns (uint256) {
-        require(posts[_postId].isNFT, "Post is not an NFT");
-        return posts[_postId].nftTokenId;
-    }
+    // Get user's posts
+    function getUserPosts(address _user) public view returns (Post[] memory) {
+        uint256 userPostCount = 0;
 
-    // Get total NFTs minted
-    function totalNFTsMinted() public view returns (uint256) {
-        return _nextTokenId - 1;
-    }
+        for (uint256 i = 1; i <= postCount; i++) {
+            if (posts[i].author == _user && !posts[i].isDeleted) {
+                userPostCount++;
+            }
+        }
 
-    // Get next token ID
-    function getNextTokenId() public view returns (uint256) {
-        return _nextTokenId;
+        Post[] memory userPosts = new Post[](userPostCount);
+        uint256 index = 0;
+
+        for (uint256 i = 1; i <= postCount; i++) {
+            if (posts[i].author == _user && !posts[i].isDeleted) {
+                userPosts[index] = posts[i];
+                index++;
+            }
+        }
+
+        return userPosts;
     }
 }

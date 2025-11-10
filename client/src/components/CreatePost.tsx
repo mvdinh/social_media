@@ -1,140 +1,274 @@
-import React, { useState } from 'react';
-import { useWallet } from '../contexts/WalletContext';
+import { Image, X, Loader2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { verifySignature } from "../helper/VerifySignature";
+import { uploadToIpfs } from "../helper/UploadToIpfs";
+import { getContract, getCurrentAccount } from "../utils/contractUtils"; // 👈 import từ helper
+import axios from "axios";
 
-const CreatePost: React.FC = () => {
-  const { account, contract, connectWallet, loading: walletLoading, executeGaslessTransaction } = useWallet();
-  const [content, setContent] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+const CreatePost = () => {
+  const acc = {
+    name: "John Warren",
+    handle: "@john_warren",
+    avatar:
+      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=40",
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // 👇 Tự quản lý user và contract ở đây
+  const [user, setUser] = useState<string | null>(null);
+  const [contract, setContract] = useState<any>(null);
+
+  const [content, setContent] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
+  const [posting, setPosting] = useState(false);
+
+  // 🔹 Load account & contract khi component mount
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const account = await getCurrentAccount();
+        if (!account) {
+          alert("Please connect your wallet first!");
+          return;
+        }
+        setUser(account);
+
+        const contractInstance = await getContract();
+        setContract(contractInstance);
+      } catch (err) {
+        console.error("Error loading wallet/contract:", err);
+      }
+    };
+    init();
+  }, []);
+
+  const handleFileChange = (e) => {
+    if (!e.target.files) return;
+    const newFiles = Array.from(e.target.files).slice(0, 4 - files.length);
     
-    if (!account || !contract) {
-      setError('Vui lòng kết nối ví MetaMask để đăng bài');
-      return;
-    }
+    newFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPreviews(prev => [...prev, e.target?.result]);
+      };
+      reader.readAsDataURL(file);
+    });
+    
+    setFiles(prev => [...prev, ...newFiles]);
+  };
 
-    if (!content.trim()) {
-      setError('Nội dung không được để trống');
+  const removeFile = (index) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const createPost = async () => {
+    if (!contract || !content.trim()) {
+      alert('Please write something!');
       return;
     }
 
     try {
-      setIsLoading(true);
-      setError('');
-      setSuccess('');
-
-      // Simulate IPFS upload - trong production, upload lên IPFS thật
-      const contentCID = `ipfs_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setPosting(true);
       
-      // Thực hiện giao dịch không tốn ETH
-      const result = await executeGaslessTransaction(
-        contract.createPost(contentCID),
-        '✅ Đăng bài thành công! (Không mất ETH)'
+      // === STEP 1: Verify signature ===
+      const { user: verifiedUser, token } = await verifySignature(user);
+      console.log('✅ User authenticated:', verifiedUser.username || verifiedUser.address);
+
+      // === STEP 2: Upload to IPFS ===
+      console.log('📤 Uploading content to IPFS...');
+      const { contentHash, mediaHashes } = await uploadToIpfs(content, user, files);
+      console.log('✅ IPFS upload complete:', { contentHash, mediaHashes });
+
+      const mediaType = mediaHashes.length > 0 ? 1 : 0;
+
+      // === STEP 3: Send transaction to blockchain ===
+      console.log('🔗 Sending transaction to blockchain...');
+      console.log('⏳ Please approve the transaction in MetaMask...');
+
+      let tx;
+      try {
+        if (mediaHashes && mediaHashes.length > 0) {
+          tx = await contract.createPostWithMedia(contentHash, mediaHashes, mediaType);
+        } else {
+          tx = await contract.createPost(contentHash);
+        }
+        console.log('✅ Transaction sent:', tx.hash);
+      } catch (txError) {
+        if (txError.code === 'ACTION_REJECTED' || txError.code === 4001) {
+          throw new Error('You rejected the transaction');
+        }
+        throw txError;
+      }
+
+      // === STEP 4: Wait for confirmation ===
+      console.log('⏳ Waiting for transaction confirmation...');
+      const receipt = await tx.wait();
+      console.log('✅ Transaction confirmed in block:', receipt.blockNumber);
+
+      const postData = {
+        txHash: receipt.hash,
+        walletAddress: user,
+        contentHash,
+        mediaHashes: mediaHashes.length > 0 ? mediaHashes : undefined,
+        mediaType,
+      };
+
+      console.log('📤 Sending data to backend:', postData);
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/post`,
+        postData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000,
+        }
       );
 
-      if (result.success) {
+      console.log('✅ Backend response:', response.data);
+
+      if (response.data.success) {
+        const { blockchainPostId, txHash, dbPostId } = response.data;
+
+        alert(
+          `✅ Post created successfully!\n\n` +
+          `Post ID: ${blockchainPostId}\n` +
+          `Database ID: ${dbPostId}\n` +
+          `Transaction: ${txHash.slice(0, 10)}...${txHash.slice(-8)}`
+        );
+
+        // Reset form
         setContent('');
-        setSuccess(result.message || 'Đăng bài thành công!');
-        
-        // Tự động ẩn thông báo sau 3 giây
-        setTimeout(() => setSuccess(''), 3000);
+        setFiles([]);
+        setPreviews([]);
+
+        // Reload to show new post
+        setTimeout(() => window.location.reload(), 1500);
       } else {
-        setError(result.error || 'Có lỗi xảy ra');
+        throw new Error('Backend returned unsuccessful response');
       }
-      
-    } catch (error: any) {
-      console.error('Error creating post:', error);
-      setError('Lỗi khi đăng bài: ' + error.message);
+
+    } catch (error) {
+      console.error('❌ Error creating post:', error);
+      alert(`Error: ${error.message || 'Failed to create post'}`);
     } finally {
-      setIsLoading(false);
+      setPosting(false);
     }
   };
 
-  // Nếu chưa kết nối ví
-  if (!account) {
-    return (
-      <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-        <div className="text-center py-8">
-          <div className="text-6xl mb-4">🔐</div>
-          <h3 className="text-xl font-semibold text-gray-800 mb-2">
-            Kết nối ví để đăng bài
-          </h3>
-          <p className="text-gray-600 mb-4">
-            Vui lòng kết nối MetaMask để có thể đăng bài và tương tác
-          </p>
-          <button
-            onClick={connectWallet}
-            disabled={walletLoading}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {walletLoading ? 'Đang kết nối...' : '🦊 Kết nối MetaMask'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-gray-800">Đăng bài mới</h3>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span>Đăng bài với:</span>
-            <span className="font-mono font-semibold text-blue-600">
-              {account.slice(0, 6)}...{account.slice(-4)}
+    <div className="min-h-screen bg-white md:bg-gray-50 p-4 md:p-8">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-800">Create Post</h1>
+        <p className="text-gray-500 mt-1">Share your thoughts with the world</p>
+      </div>
+
+      <div className="max-w-xl mx-auto md:mx-0 bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+        {/* Account INFO */}
+        <div className="flex items-center space-x-3 mb-4">
+          <img
+            src={acc.avatar}
+            alt={acc.name}
+            className="h-10 w-10 rounded-full object-cover border border-gray-200"
+          />
+          <div>
+            <p className="text-gray-800 font-semibold text-sm">{user}</p>
+            <p className="text-gray-500 text-xs">{acc.handle}</p>
+          </div>
+        </div>
+
+        {/* TEXTAREA FOR POST CONTENT */}
+        <div className="py-2">
+          <textarea
+            className="w-full resize-none border-none focus:outline-none text-gray-700 placeholder-gray-400 text-lg"
+            rows="3"
+            placeholder="What's happening?"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            disabled={posting}
+          ></textarea>
+        </div>
+
+        {/* Image Previews */}
+        {previews.length > 0 && (
+          <div className={`gap-2 mb-4 ${previews.length === 1 ? 'flex justify-center' : 'grid grid-cols-2'}`}>
+            {previews.map((preview, index) => (
+              <div 
+                key={index} 
+                className={`relative group rounded-lg overflow-hidden border border-gray-200 bg-gray-50 ${
+                  previews.length === 1 ? 'max-w-md' : ''
+                }`}
+              >
+                <img
+                  src={preview}
+                  alt={`Preview ${index + 1}`}
+                  className="w-full h-40 object-contain"
+                />
+                <button
+                  onClick={() => removeFile(index)}
+                  className="absolute top-2 right-2 bg-gray-900 bg-opacity-70 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-opacity-90"
+                  disabled={posting}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Character count */}
+        {content.length > 0 && (
+          <div className="flex justify-end mb-2">
+            <span className={`text-xs ${content.length > 280 ? 'text-red-500' : 'text-gray-400'}`}>
+              {content.length} / 280
             </span>
           </div>
-        </div>
+        )}
 
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Bạn đang nghĩ gì? 💭"
-          rows={4}
-          maxLength={280}
-          disabled={isLoading}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-        />
+        <div className="flex justify-between items-center pt-4 border-t border-gray-100 mt-2">
+          {/* Image Icon Button */}
+          <div className="relative">
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFileChange}
+              className="hidden"
+              id="file-upload"
+              disabled={posting || files.length >= 4}
+            />
+            <label
+              htmlFor="file-upload"
+              className={`text-gray-500 hover:text-purple-600 transition duration-150 cursor-pointer inline-flex items-center ${
+                posting || files.length >= 4 ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              <Image className="h-6 w-6" />
+              {files.length > 0 && (
+                <span className="ml-1 text-xs font-medium">{files.length}/4</span>
+              )}
+            </label>
+          </div>
 
-        <div className="flex items-center justify-between">
-          <span className={`text-sm ${content.length > 250 ? 'text-red-500' : 'text-gray-500'}`}>
-            {content.length}/280
-          </span>
           <button
-            type="submit"
-            disabled={isLoading || !content.trim()}
-            className="bg-green-500 hover:bg-green-600 text-white font-semibold px-6 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            onClick={createPost}
+            disabled={posting || !content.trim() || content.length > 280}
+            className="px-6 py-2 bg-purple-600 text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 transition duration-150 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {isLoading ? (
+            {posting ? (
               <>
-                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Đang đăng...
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Publishing...
               </>
             ) : (
-              <>📤 Đăng bài (Free)</>
+              'Publish Post'
             )}
           </button>
+
         </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            ❌ {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-            {success}
-          </div>
-        )}
-      </form>
+      </div>
     </div>
   );
 };

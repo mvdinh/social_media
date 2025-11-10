@@ -1,5 +1,4 @@
 import { Route, Routes, Navigate } from "react-router-dom";
-import CreatePost from "./pages/CreatePost/CreatePost";
 import Connection from "./pages/Connections";
 import Discover from "./pages/Discover";
 import Profile from "./pages/Profile";
@@ -10,8 +9,8 @@ import CreateStoryModal from "./pages/CreateStory";
 import CheckCreatePost from "./pages/CreatePost/CheckCreatePost";
 import LikeButton from "./pages/CreatePost/a";
 import GetAllPost from "./pages/GetAllPost";
-import BlockchainSocial from "./Test/Post";
-
+import PostFeed from "./Test/ListPosts";
+import CreatePost from "./components/CreatePost";
 function App() {
   return (
     <Routes>
@@ -33,7 +32,7 @@ function App() {
         <Route path="like" element={<CheckCreatePost/>} />
 
         {/* Test */}
-        <Route path="tets" element={<BlockchainSocial/>} />
+        <Route path="feed-tet" element={<PostFeed/>} />
      </Route>
     </Routes>
   );

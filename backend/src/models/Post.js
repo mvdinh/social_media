@@ -38,6 +38,10 @@ const postSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  comments:{
+    type: Number,
+    default: 0
+  },
   isNFT: {
     type: Boolean,
     default: false
