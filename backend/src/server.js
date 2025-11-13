@@ -18,6 +18,8 @@ import ipfsProxyRoutes from './routes/ipfsProxy.js';
 import likeRoutes from './routes/like.js';
 import commentRoutes from './routes/comment.js';
 import shareRoutes from './routes/share.js';
+import userRoutes from './routes/user.routes.js'
+
 
 
 
@@ -79,6 +81,7 @@ app.use('/api/comments', commentRoutes); // Add/Delete comments
 app.use('/api/shares', shareRoutes); // Add/Delete comments
 
 app.use('/api/getIPFS/', getIPFSRoutes)
+app.use('/api/friends/', userRoutes)
 
 
 app

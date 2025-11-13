@@ -7,8 +7,9 @@ import {
   Users,
   ChevronRight,
 } from "lucide-react";
-import api from "../services/api";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext"; // import hook context
+import { useEffect } from "react";
 
 const menuItems = [
   { icon: Settings, text: "Cài đặt và quyền riêng tư" },
@@ -18,8 +19,9 @@ const menuItems = [
   { icon: LogOut, text: "Đăng xuất", action: "logout" },
 ];
 
-const UserMenuDropdown = ({ user }) => {
+const UserMenuDropdown = ({ user }: { user: any }) => {
   const navigate = useNavigate();
+  const { logout , address} = useAuth(); // lấy hàm logout từ context
 
   if (!user) return null;
 
@@ -27,27 +29,13 @@ const UserMenuDropdown = ({ user }) => {
     "flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition duration-150 cursor-pointer";
   const iconClass = "h-5 w-5 text-gray-600 mr-3";
 
-  const handleLogout = async () => {
-    try {
-      const tokens = JSON.parse(localStorage.getItem("tokens"));
-      if (tokens?.refreshToken) {
-        await api.auth.logout(tokens.refreshToken);
-      }
-      localStorage.clear();
-      navigate("/");
-    } catch (error) {
-      console.error("Logout failed:", error);
-      localStorage.clear();
-      navigate("/");
-    }
-  };
-
-  const handleMenuClick = (item) => {
+  const handleMenuClick = (item: typeof menuItems[0]) => {
     if (item.action === "logout") {
-      handleLogout();
+      logout();      // gọi context logout
+      navigate("/"); // redirect về trang login/home
+      console.log('user after logout',address )
     } else {
       console.log(`Clicked on: ${item.text}`);
-      // Có thể điều hướng đến các trang khác ở đây
     }
   };
 

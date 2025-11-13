@@ -1,0 +1,53 @@
+import { connectWallet, getContract } from "../../utils/wallet";
+import { useAuth } from "../../context/AuthContext";
+import axios from "axios";
+import { ethers } from "ethers";
+
+interface RejectButtonProps {
+  requestAddress: string; // địa chỉ người gửi lời mời
+  onRejected?: () => void; // callback sau khi từ chối thành công
+}
+
+export function RejectButton({ requestAddress, onRejected }: RejectButtonProps) {
+  const { address } = useAuth();
+
+  const handleReject = async () => {
+    try {
+      // ✅ 1. Đảm bảo ví đã kết nối
+      const currentAddress = address || (await connectWallet());
+
+      // ✅ 2. Gọi contract để từ chối lời mời
+      const contract = await getContract();
+      const tx = await contract.rejectFriendRequest(requestAddress);
+      await tx.wait();
+
+      // ✅ 3. Ký message xác thực từ chối
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const message = `Từ chối lời mời kết bạn từ ${requestAddress}`;
+      const signature = await signer.signMessage(message);
+
+      // ✅ 4. Gửi dữ liệu verify lên backend
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/friends/reject`, {
+        currentAddress,
+        friendAddress: requestAddress,
+        signature,
+      });
+
+      alert("🚫 Đã từ chối lời mời kết bạn!");
+      if (onRejected) onRejected();
+    } catch (err) {
+      console.error("Reject error:", err);
+      alert("❌ Lỗi khi từ chối lời mời kết bạn");
+    }
+  };
+
+  return (
+    <button
+      onClick={handleReject}
+      className="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors"
+    >
+      Xóa
+    </button>
+  );
+}

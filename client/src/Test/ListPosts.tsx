@@ -4,6 +4,7 @@ import { Loader2, RefreshCw, Image as ImageIcon } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import PostCard from './PostCard';
+import { useAuth } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
@@ -19,8 +20,7 @@ interface Post {
 }
 
 const ListPosts = () => {
-  const user = useSelector((state: RootState) => state.app.user);
-  const contract = useSelector((state: RootState) => state.app.contract);
+  const {address , contract } = useAuth();
 
   const [dataPosts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +32,8 @@ const ListPosts = () => {
 
   useEffect(() => {
     console.log('📊 Updated dataPosts:', dataPosts);
-  }, [dataPosts]);
+    console.log('user', address)
+  }, [dataPosts, address]);
 
   const fetchPosts = async () => {
     try {
@@ -121,7 +122,7 @@ const ListPosts = () => {
         <PostCard
           key={post._id}
           post={post}
-          user={user}
+          user={address}
           contract={contract}
         />
       ))}

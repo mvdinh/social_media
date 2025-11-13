@@ -1,0 +1,23 @@
+{
+  "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+  "abi": [
+    "event FriendRequestAccepted(address indexed,address indexed)",
+    "event FriendRequestCancelled(address indexed,address indexed)",
+    "event FriendRequestRejected(address indexed,address indexed)",
+    "event FriendRequestSent(address indexed,address indexed)",
+    "event Unfriended(address indexed,address indexed)",
+    "function acceptFriendRequest(address)",
+    "function areFriends(address,address) view returns (bool)",
+    "function cancelFriendRequest(address)",
+    "function friendships(address,address) view returns (uint8)",
+    "function getAllFriends(address) view returns (address[])",
+    "function getAllPendingRequests(address) view returns (address[])",
+    "function getAllSentRequests(address) view returns (address[])",
+    "function getAllUsers() view returns (address[])",
+    "function getFriendCount(address) view returns (uint256)",
+    "function getFriendshipStatus(address,address) view returns (uint8)",
+    "function rejectFriendRequest(address)",
+    "function sendFriendRequest(address)",
+    "function unfriend(address)"
+  ]
+}
