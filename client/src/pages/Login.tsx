@@ -1,28 +1,34 @@
 import { useAuth } from "../context/AuthContext";
 import { Wallet, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { useState } from "react";
 
 const Login = () => {
-  const { connectWallet, address, loading, error } = useAuth();
+  const { connectWallet, loading, error } = useAuth();
   const navigate = useNavigate();
+  const [localError, setLocalError] = useState("");
 
   const handleConnect = async () => {
-    const connectedAddress = await connectWallet();
-    if (connectedAddress) {
-      const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/auth/register`,
-    {
-      acc: connectedAddress,
-    }
-    );
+    setLocalError("");
 
-    if (response) {
-      console.log('user', response.data);
-      navigate("/feed");
-    }
-  }
-};
+    const result = await connectWallet();
 
+    if (!result) {
+      setLocalError("Failed to connect wallet");
+      return;
+    }
+
+    if (!result.address) {
+      setLocalError("Wallet address not found");
+      return;
+    }
+
+    console.log("🔐 Wallet connected:", result.address);
+    console.log("📦 Loaded contracts:", Object.keys(result.contracts));
+
+    // Chuyển trang NGAY LẬP TỨC
+    navigate("/feed");
+  };
 
   return (
     <div className="relative min-h-screen flex items-center">
@@ -59,7 +65,11 @@ const Login = () => {
                 <p className="text-gray-600">Connect your wallet to continue</p>
               </div>
 
-              {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
+              {(error || localError) && (
+                <p className="text-red-500 text-sm text-center mb-4">
+                  {error || localError}
+                </p>
+              )}
 
               <button
                 onClick={handleConnect}

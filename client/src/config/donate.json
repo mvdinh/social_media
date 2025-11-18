@@ -1,0 +1,18 @@
+{
+  "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "abi": [
+    "event Donated(uint256 indexed,address indexed,uint256)",
+    "event PostCreated(uint256 indexed,address indexed,string)",
+    "event Withdrawn(uint256 indexed,address indexed,uint256)",
+    "function createPost(string) returns (uint256)",
+    "function donate(uint256) payable",
+    "function getDonationEntry(uint256,uint256) view returns (address,uint256,uint256)",
+    "function getDonationsCount(uint256) view returns (uint256)",
+    "function getPostBalance(uint256) view returns (uint256)",
+    "function getPostTotal(uint256) view returns (uint256)",
+    "function getTotalPosts() view returns (uint256)",
+    "function posts(uint256) view returns (address,string,uint256,uint256,uint256,bool)",
+    "function withdraw(uint256)",
+    "receive() payable"
+  ]
+}

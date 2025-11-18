@@ -1,12 +1,13 @@
 import mongoose from "mongoose";
 
 const relationshipSchema = new mongoose.Schema({
-  user1: { type: String, required: true }, // dùng string thay vì ObjectId
-  user2: { type: String, required: true }, // dùng string thay vì ObjectId
-  status: { type: String, enum: ["NONE", "PENDING", "ACCEPTED"], default: "NONE" },
-}, { timestamps: true });
+  sender: { type: String, required: true },
+  receiver: { type: String, required: true },
+  status: { type: String, enum: ["NONE", "SENT_PENDING", "RECEIVED_PENDING", "ACCEPTED"], default: "NONE" },
+  createdAt: { type: Date, default: Date.now },
+});
 
-// tạo index để tránh duplicate
-relationshipSchema.index({ user1: 1, user2: 1 }, { unique: true });
+// Index để tránh duplicate sender-receiver
+relationshipSchema.index({ sender: 1, receiver: 1 }, { unique: true });
 
 export default mongoose.model("Relationship", relationshipSchema);

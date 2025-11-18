@@ -18,6 +18,7 @@ import { mockFriends } from "./components/Friend/mockData";
 import Fr from './views/FrientTest'
 import FriendTest from "./views/FrientTest";
 import FriendPage from "./components/FriendPage";
+import DonationPage from "./components/Donation/DonatePage";
 function App() {
   return (
     <Routes>
@@ -39,6 +40,7 @@ function App() {
         <Route path="create-post" element={<CreatePost />} />
         {/* <Route path="addfriend" element={<FriendRequestsPage requests={mockFriendRequests} />} /> */}
         <Route path="friends" element={<FriendsPage/>}/>
+        <Route path="donation" element={<DonationPage/>}/>
 
 
         {/* Test */}

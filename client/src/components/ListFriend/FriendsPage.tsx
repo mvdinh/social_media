@@ -2,112 +2,103 @@ import { useState, useEffect } from "react";
 import { FriendList } from "./FriendList";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
-import { ethers } from "ethers";
 import { connectWallet, getContract } from "../../utils/wallet";
+
+export type FriendStatus = "RECEIVED_PENDING";
 
 export interface Friend {
   address: string;
   name: string;
   avatar: string;
-  status: "NONE" | "PENDING" | "ACCEPTED";
+  status: FriendStatus;
   mutualFriends?: number;
 }
 
-const FriendsPage = () => {
+const FriendRequestsPage = () => {
   const { address } = useAuth();
-  const [friends, setFriends] = useState<Friend[]>([]);
+  const [requests, setRequests] = useState<Friend[]>([]);
   const [notification, setNotification] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [loadingTx, setLoadingTx] = useState<boolean>(false);
 
-  const showNotification = (message: string) => {
-    setNotification(message);
+  const showNotification = (msg: string) => {
+    setNotification(msg);
     setTimeout(() => setNotification(""), 3000);
   };
 
-  const handleStatusChange = (friendAddress: string, newStatus: "NONE" | "PENDING" | "ACCEPTED") => {
-    setFriends(prev =>
-      prev.map(f => (f.address === friendAddress ? { ...f, status: newStatus } : f))
-    );
-  };
-
-  // === CONTRACT FUNCTIONS ===
-  const sendFriendRequest = async (friendAddress: string) => {
-  const currentAddress = address || (await connectWallet());
-  const contract = await getContract();
-
-  try {
-    const tx = await contract.sendFriendRequest(friendAddress);
-    const receipt = await tx.wait();
-
-    if (receipt.status === 1) {
-      console.log("✅ Gửi lời mời kết bạn thành công:", tx.hash);
-      handleStatusChange(friendAddress, "PENDING");
-      showNotification("Gửi lời mời kết bạn thành công!");
-    } else {
-      console.error("❌ Giao dịch thất bại:", tx.hash);
-      handleStatusChange(friendAddress, "NONE");
-      showNotification("Gửi lời mời thất bại");
-    }
-  } catch (err) {
-    console.error("❌ Lỗi khi gửi lời mời:", err);
-    handleStatusChange(friendAddress, "NONE"); // rollback
-    showNotification("Gửi lời mời thất bại");
-  }
-};
-
-
-
-  const cancelFriendRequest = async (friendAddress: string) => {
-    const currentAddress = address || (await connectWallet());
-    const contract = await getContract();
-
-    // Optimistic update: set NONE ngay
-    // handleStatusChange(friendAddress, "NONE");
+  // ==== FETCH RECEIVED FRIEND REQUESTS FROM BACKEND ====
+  const fetchFriendRequests = async () => {
+    if (!address) return;
 
     try {
-      const tx = await contract.cancelFriend(friendAddress);
-      await tx.wait();
-      handleStatusChange(friendAddress, "NONE");
-      showNotification("Hủy kết bạn thành công!");
+      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/friends/received`, {
+        params: { currentAddress: address },
+      });
+
+      if (res.data.success) {
+        const mapped: Friend[] = res.data.requests.map((u: any) => ({
+          address: u.sender,
+          name: u.name,
+          avatar: u.avatar || "https://i.pravatar.cc/150",
+          status: "RECEIVED_PENDING",
+          mutualFriends: u.mutualFriends || 0,
+        }));
+
+        setRequests(mapped);
+      }
     } catch (err) {
       console.error(err);
-      handleStatusChange(friendAddress, "ACCEPTED"); // rollback
-      showNotification("Hủy kết bạn thất bại");
+      showNotification("Lỗi khi gọi API");
     }
   };
 
-  // === FETCH FRIENDS ===
   useEffect(() => {
-    const fetchFriends = async () => {
-      try {
-        const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/friends/list`, {
-          params: { currentAddress: address },
-        });
-
-        if (res.data.success) {
-          const mapped: Friend[] = res.data.users.map((u: any) => ({
-            address: u.address,
-            name: u.name,
-            avatar: u.avatar || "https://i.pravatar.cc/150",
-            status: u.status || "LOADING",
-            mutualFriends: u.mutualFriends || 0,
-          }));
-          setFriends(mapped);
-        } else {
-          showNotification("Không thể tải danh sách bạn bè");
-        }
-      } catch (err) {
-        console.error(err);
-        showNotification("Lỗi khi gọi API");
-      }
-    };
-
-    if (address) fetchFriends();
+    fetchFriendRequests();
   }, [address]);
 
-  const filteredFriends = friends.filter(friend =>
-    friend.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // === CONTRACT FUNCTIONS ===
+  const acceptFriendRequest = async (friendAddress: string) => {
+    if (loadingTx) return;
+    setLoadingTx(true);
+
+    try {
+      await connectWallet();
+      const contract = await getContract();
+
+      const tx = await contract.acceptFriendRequest(friendAddress);
+      await tx.wait();
+      showNotification("Chấp nhận lời mời thành công!");
+
+      // Remove from UI
+      setRequests(prev => prev.filter(f => f.address !== friendAddress));
+    } catch (err) {
+      console.error(err);
+      showNotification("Chấp nhận thất bại");
+    } finally {
+      setLoadingTx(false);
+    }
+  };
+
+  const rejectFriendRequest = async (friendAddress: string) => {
+    if (loadingTx) return;
+    setLoadingTx(true);
+
+    try {
+      await connectWallet();
+      const contract = await getContract();
+
+      const tx = await contract.rejectFriendRequest(friendAddress);
+      await tx.wait();
+      showNotification("Từ chối lời mời thành công!");
+
+      // Remove from UI
+      setRequests(prev => prev.filter(f => f.address !== friendAddress));
+    } catch (err) {
+      console.error(err);
+      showNotification("Từ chối thất bại");
+    } finally {
+      setLoadingTx(false);
+    }
+  };
 
   return (
     <div className="w-full p-6 bg-gray-50 min-h-screen">
@@ -117,36 +108,21 @@ const FriendsPage = () => {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <div className="flex items-center justify-between gap-4 mb-4">
-            <div>
-              <h1 className="text-gray-900 mb-1">Bạn bè</h1>
-              <p className="text-gray-500">
-                {filteredFriends.length > 0
-                  ? `${filteredFriends.length} người bạn`
-                  : "Không tìm thấy bạn bè"}
-              </p>
-            </div>
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-gray-900 mb-4 text-2xl font-semibold">Lời mời kết bạn</h1>
 
-            <input
-              type="text"
-              placeholder="Tìm kiếm bạn bè..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-3xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-
-        <FriendList
-          friends={filteredFriends}
-          onAddFriend={sendFriendRequest}
-          onCancelFriend={cancelFriendRequest}
-        />
+        {requests.length === 0 ? (
+          <p className="text-gray-500 text-center py-12">Không có lời mời kết bạn nào</p>
+        ) : (
+          <FriendList
+            friends={requests}
+            onAcceptFriend={acceptFriendRequest}
+            onRejectFriend={rejectFriendRequest}
+          />
+        )}
       </div>
     </div>
   );
 };
 
-export default FriendsPage;
+export default FriendRequestsPage;

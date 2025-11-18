@@ -1,6 +1,7 @@
 import {
   Bell,
   Clapperboard,
+  HandHeart,
   Home,
   LayoutGrid,
   MessageCircle,

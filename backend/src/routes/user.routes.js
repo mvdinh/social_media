@@ -1,6 +1,6 @@
 import express from "express";
-import User from "../models/user.model.js";
 import Relationship from "../models/relationship.model.js";
+import User from "../models/user.model.js";
 import { ethers } from "ethers";
 import fs from "fs";
 import path from "path";
@@ -11,138 +11,344 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 // Load contract
-const friendSystem = JSON.parse(fs.readFileSync(path.join(__dirname, "../config/friendSystem.json")));
+const friendSystem = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "../config/friendSystem.json"))
+);
 const RPC_URL = process.env.RPC_URL || "http://127.0.0.1:8545";
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const contract = new ethers.Contract(friendSystem.address, friendSystem.abi, provider);
 
-// Hàm lấy status bạn bè trên blockchain
-async function getFriendshipStatus(user1, user2) {
+// Map numeric status -> string
+const STATUS_MAP = ["NONE", "PENDING", "ACCEPTED"];
+
+// ==== HELPER: check blockchain status 2 chiều ====
+async function getChainStatus(sender, receiver) {
   try {
-    const status = await contract.getFriendshipStatus(user1, user2);
-    const map = ["NONE", "PENDING", "ACCEPTED"];
-    return map[Number(status)] || "UNKNOWN";
+    const [s, r] = await Promise.all([
+      contract.getFriendshipStatus(sender, receiver),
+      contract.getFriendshipStatus(receiver, sender),
+    ]);
+    const statusS = STATUS_MAP[Number(s)];
+    const statusR = STATUS_MAP[Number(r)];
+
+    // Map to UI-friendly status
+    if (statusS === "ACCEPTED" || statusR === "ACCEPTED") return "ACCEPTED";
+    if (statusS === "PENDING") return "SENT_PENDING";
+    if (statusR === "PENDING") return "RECEIVED_PENDING";
+    return "NONE";
   } catch (err) {
-    console.error("getFriendshipStatus error:", err);
-    return "ERROR";
+    console.error("getChainStatus error:", err);
+    return "NONE";
   }
 }
 
-// ===== API /list tối ưu với verify blockchain =====
+// ==== GET ALL FRIENDS / LIST ====
 router.get("/list", async (req, res) => {
+  const { currentAddress } = req.query;
+  if (!currentAddress) {
+    return res.status(400).json({ success: false, message: "Missing currentAddress" });
+  }
+
   try {
-    const { currentAddress } = req.query;
-    if (!currentAddress) return res.status(400).json({ success: false, message: "Missing currentAddress" });
-
-    // 1️⃣ Lấy danh sách user từ DB
-    const users = await User.find({ address: { $ne: currentAddress } });
-
-    // 2️⃣ Lấy relationships hiện tại từ DB
-    const relationships = await Relationship.find({
-      $or: [{ user1: currentAddress }, { user2: currentAddress }],
+    const requests = await Relationship.find({
+      $or: [{ sender: currentAddress }, { receiver: currentAddress }],
     });
 
-    // 3️⃣ Chuẩn bị kết quả, dùng DB làm mặc định
-    const results = await Promise.all(users.map(async (u) => {
-      // Tìm trong DB
-      let rel = relationships.find(r =>
-        (r.user1 === currentAddress && r.user2 === u.address) ||
-        (r.user2 === currentAddress && r.user1 === u.address)
-      );
+    const users = await Promise.all(
+      requests.map(async (r) => {
+        const friendAddress = r.sender === currentAddress ? r.receiver : r.sender;
+        const chainStatus = await getChainStatus(currentAddress, friendAddress);
+        return {
+          address: friendAddress,
+          sender: r.sender,
+          receiver: r.receiver,
+          status: chainStatus,
+        };
+      })
+    );
 
-      let dbStatus = rel ? rel.status : "NONE";
-
-      // 4️⃣ Verify với blockchain
-      const chainStatus = await getFriendshipStatus(currentAddress, u.address);
-
-      // 5️⃣ Nếu khác DB → update DB
-      if (chainStatus !== dbStatus && chainStatus !== "ERROR") {
-        if (rel) {
-          rel.status = chainStatus;
-          await rel.save();
-        } else if (chainStatus !== "NONE") {
-          await Relationship.create({
-            user1: currentAddress,
-            user2: u.address,
-            status: chainStatus
-          });
-        }
-        dbStatus = chainStatus;
-      }
-
-      return {
-        address: u.address,
-        name: u.name || "Unknown",
-        status: dbStatus
-      };
-    }));
-
-    res.json({ success: true, users: results });
-
+    res.json({ success: true, users });
   } catch (err) {
-    console.error("List users error:", err);
+    console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
-
-// ===== API 1: Lấy danh sách lời mời pending =====
+// ==== GET PENDING RECEIVED ====
 router.get("/:address/pending", async (req, res) => {
   const { address } = req.params;
+
   try {
-    // Lấy lời mời từ DB
-    const pending = await Relationship.find({
-      $or: [{ user1: address, status: "PENDING" }, { user2: address, status: "PENDING" }]
+    const requests = await Relationship.find({ 
+      receiver: address, 
+      status: "PENDING" 
     });
-
-    // Optionally: verify blockchain
-    const results = await Promise.all(pending.map(async r => {
-      const chainStatus = await getFriendshipStatus(r.user1, r.user2);
-      if (chainStatus !== r.status && chainStatus !== "ERROR") {
-        r.status = chainStatus;
-        await r.save();
-      }
-      return {
-        user1: r.user1,
-        user2: r.user2,
-        status: r.status
-      };
-    }));
-
-    res.json({ success: true, pending: results });
+    
+    const pending = await Promise.all(
+      requests.map(async (r) => {
+        const chainStatus = await getChainStatus(r.sender, r.receiver);
+        return { 
+          from: r.sender, 
+          to: r.receiver, 
+          status: chainStatus,
+          createdAt: r.createdAt 
+        };
+      })
+    );
+    
+    res.json({ success: true, pending });
   } catch (err) {
-    console.error("Get pending error:", err);
+    console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
-// ===== API 2: Lấy danh sách bạn bè =====
+// ==== GET FRIENDS ====
 router.get("/:address/friends", async (req, res) => {
   const { address } = req.params;
+
   try {
-    const friends = await Relationship.find({
+    const requests = await Relationship.find({
+      $or: [{ sender: address }, { receiver: address }],
+      status: "ACCEPTED",
+    });
+
+    const friends = await Promise.all(
+      requests.map(async (r) => {
+        const friendAddr = r.sender === address ? r.receiver : r.sender;
+        const chainStatus = await getChainStatus(address, friendAddr);
+        return { 
+          friend: friendAddr, 
+          status: chainStatus,
+          acceptedAt: r.updatedAt
+        };
+      })
+    );
+
+    res.json({ success: true, friends });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ==== GỬI LỜI MỜI KẾT BẠN ====
+router.post("/send-request", async (req, res) => {
+  const { sender, receiver } = req.body;
+
+  if (!sender || !receiver) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "Missing sender or receiver address" 
+    });
+  }
+
+  if (sender === receiver) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "Cannot send friend request to yourself" 
+    });
+  }
+
+  try {
+    // Kiểm tra xem đã có quan hệ nào chưa
+    const existingRelation = await Relationship.findOne({
       $or: [
-        { user1: address, status: "ACCEPTED" },
-        { user2: address, status: "ACCEPTED" }
+        { sender, receiver },
+        { sender: receiver, receiver: sender }
       ]
     });
 
-    // Verify blockchain nếu muốn
-    const results = await Promise.all(friends.map(async r => {
-      const chainStatus = await getFriendshipStatus(r.user1, r.user2);
-      if (chainStatus !== r.status && chainStatus !== "ERROR") {
-        r.status = chainStatus;
-        await r.save();
+    if (existingRelation) {
+      if (existingRelation.status === "ACCEPTED") {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Already friends" 
+        });
       }
-      return {
-        friend: r.user1 === address ? r.user2 : r.user1,
-        status: r.status
-      };
-    }));
+      if (existingRelation.status === "PENDING") {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Friend request already sent" 
+        });
+      }
+    }
 
-    res.json({ success: true, friends: results });
+    // Kiểm tra user receiver có tồn tại không
+    const receiverUser = await User.findOne({ address: receiver });
+    if (!receiverUser) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Receiver user not found" 
+      });
+    }
+
+    // Tạo quan hệ mới
+    const newRelation = new Relationship({
+      sender,
+      receiver,
+      status: "PENDING"
+    });
+
+    await newRelation.save();
+
+    res.json({ 
+      success: true, 
+      message: "Friend request sent successfully",
+      relationship: newRelation
+    });
   } catch (err) {
-    console.error("Get friends error:", err);
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ==== HỦY LỜI MỜI KẾT BẠN ====
+router.delete("/cancel-request", async (req, res) => {
+  const { sender, receiver } = req.body;
+
+  if (!sender || !receiver) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "Missing sender or receiver address" 
+    });
+  }
+
+  try {
+    // Tìm và xóa quan hệ PENDING do sender gửi
+    const relation = await Relationship.findOneAndDelete({
+      sender,
+      receiver,
+      status: "PENDING"
+    });
+
+    if (!relation) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Friend request not found or already processed" 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: "Friend request cancelled successfully" 
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ==== CHẤP NHẬN LỜI MỜI KẾT BẠN ====
+router.post("/accept-request", async (req, res) => {
+  const { sender, receiver } = req.body;
+
+  if (!sender || !receiver) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "Missing sender or receiver address" 
+    });
+  }
+
+  try {
+    // Tìm quan hệ PENDING
+    const relation = await Relationship.findOne({
+      sender,
+      receiver,
+      status: "PENDING"
+    });
+
+    if (!relation) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Friend request not found" 
+      });
+    }
+
+    // Cập nhật status thành ACCEPTED
+    relation.status = "ACCEPTED";
+    await relation.save();
+
+    res.json({ 
+      success: true, 
+      message: "Friend request accepted successfully",
+      relationship: relation
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ==== TỪ CHỐI LỜI MỜI KẾT BẠN ====
+router.delete("/reject-request", async (req, res) => {
+  const { sender, receiver } = req.body;
+
+  if (!sender || !receiver) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "Missing sender or receiver address" 
+    });
+  }
+
+  try {
+    // Xóa quan hệ PENDING
+    const relation = await Relationship.findOneAndDelete({
+      sender,
+      receiver,
+      status: "PENDING"
+    });
+
+    if (!relation) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Friend request not found" 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: "Friend request rejected successfully" 
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ==== HỦY KẾT BẠN (UNFRIEND) ====
+router.delete("/unfriend", async (req, res) => {
+  const { address1, address2 } = req.body;
+
+  if (!address1 || !address2) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "Missing addresses" 
+    });
+  }
+
+  try {
+    // Tìm và xóa quan hệ ACCEPTED
+    const relation = await Relationship.findOneAndDelete({
+      $or: [
+        { sender: address1, receiver: address2, status: "ACCEPTED" },
+        { sender: address2, receiver: address1, status: "ACCEPTED" }
+      ]
+    });
+
+    if (!relation) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Friendship not found" 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: "Unfriended successfully" 
+    });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });

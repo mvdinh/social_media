@@ -3,16 +3,16 @@ import { Friend } from "../../types/friend";
 
 interface FriendCardProps {
   friend: Friend;
-  onAddFriend: (address: string) => void;
-  onCancelFriend: (address: string) => void;
+  onAcceptFriend: (address: string) => void;
+  onRejectFriend: (address: string) => void;
 }
 
-export function FriendCard({ friend, onAddFriend, onCancelFriend }: FriendCardProps) {
+export function FriendCard({ friend, onAcceptFriend, onRejectFriend }: FriendCardProps) {
   const handleClick = () => {
     if (friend.status === "NONE") {
-      onAddFriend(friend.address);
+      onAcceptFriend(friend.address);
     } else {
-      onCancelFriend(friend.address);
+      onRejectFriend(friend.address);
     }
   };
 
@@ -25,7 +25,7 @@ export function FriendCard({ friend, onAddFriend, onCancelFriend }: FriendCardPr
           className="w-20 h-20 rounded-lg object-cover"
         />
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-900 truncate">{friend.name}</h3>
+          <h3 className="font-semibold text-gray-900 truncate">{friend.address}</h3>
           {friend.mutualFriends && friend.mutualFriends > 0 && (
             <p className="text-gray-500 text-sm">{friend.mutualFriends} bạn chung</p>
           )}

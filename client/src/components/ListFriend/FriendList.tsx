@@ -5,11 +5,11 @@ import { FriendCard } from "./FriendCard";
 
 interface FriendListProps {
   friends: Friend[];
-  onAddFriend: (address: string) => void;
-  onCancelFriend: (address: string) => void;
+  onAcceptFriend: (address: string) => void;
+  onRejectFriend: (address: string) => void;
 }
 
-export function FriendList({ friends, onAddFriend, onCancelFriend }: FriendListProps) {
+export function FriendList({ friends, onAcceptFriend, onRejectFriend }: FriendListProps) {
   if (friends.length === 0) {
     return (
       <div className="text-center py-12">
@@ -24,8 +24,8 @@ export function FriendList({ friends, onAddFriend, onCancelFriend }: FriendListP
         <FriendCard
           key={friend.address}
           friend={friend}
-          onAddFriend={onAddFriend}
-          onCancelFriend={onCancelFriend}
+          onAcceptFriend={onAcceptFriend}
+          onRejectFriend={onRejectFriend}
         />
       ))}
     </div>
