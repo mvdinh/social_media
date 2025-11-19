@@ -3,8 +3,7 @@ pragma solidity 0.8.20;
 
 /**
  * @title SocialMedia
- * @dev Simplified social media contract WITHOUT OpenZeppelin dependencies
- * @notice Bỏ NFT feature để tránh lỗi import OpenZeppelin
+ * @dev Simplified social media contract without Share feature
  */
 contract SocialMedia {
     enum MediaType {
@@ -22,7 +21,6 @@ contract SocialMedia {
         MediaType mediaType;
         uint256 timestamp;
         uint256 likes;
-        uint256 shares;
         bool isDeleted;
     }
 
@@ -37,7 +35,6 @@ contract SocialMedia {
     mapping(uint256 => Post) public posts;
     mapping(uint256 => mapping(address => bool)) public hasLiked;
     mapping(uint256 => Comment[]) public postComments;
-    mapping(uint256 => address[]) public postShares;
 
     uint256 public postCount;
 
@@ -50,7 +47,6 @@ contract SocialMedia {
     event PostDeleted(uint256 indexed postId, address indexed author);
     event PostLiked(uint256 indexed postId, address indexed user);
     event PostUnliked(uint256 indexed postId, address indexed user);
-    event PostShared(uint256 indexed postId, address indexed user);
     event CommentAdded(
         uint256 indexed postId,
         address indexed author,
@@ -83,7 +79,6 @@ contract SocialMedia {
             mediaType: MediaType.TEXT,
             timestamp: block.timestamp,
             likes: 0,
-            shares: 0,
             isDeleted: false
         });
 
@@ -115,7 +110,6 @@ contract SocialMedia {
             mediaType: _mediaType,
             timestamp: block.timestamp,
             likes: 0,
-            shares: 0,
             isDeleted: false
         });
 
@@ -150,14 +144,6 @@ contract SocialMedia {
         hasLiked[_postId][msg.sender] = false;
 
         emit PostUnliked(_postId, msg.sender);
-    }
-
-    // Share post
-    function sharePost(uint256 _postId) public postExists(_postId) {
-        posts[_postId].shares++;
-        postShares[_postId].push(msg.sender);
-
-        emit PostShared(_postId, msg.sender);
     }
 
     // Add comment
@@ -248,13 +234,6 @@ contract SocialMedia {
     ) public view returns (bool) {
         require(_postId > 0 && _postId <= postCount, "Post does not exist");
         return hasLiked[_postId][_user];
-    }
-
-    function getPostShares(
-        uint256 _postId
-    ) public view returns (address[] memory) {
-        require(_postId > 0 && _postId <= postCount, "Post does not exist");
-        return postShares[_postId];
     }
 
     function getMediaType(

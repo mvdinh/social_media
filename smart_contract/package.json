@@ -9,7 +9,7 @@
   "scripts": {
     "node": "npx hardhat node",
     "compile": "npx hardhat compile",
-    "deploy": "npx hardhat run scripts/deploy.js --network localhost",
+    "deploy": "npx hardhat run scripts/deployPost.js --network localhost",
     "deploy1": "npx hardhat run scripts/deployFriendSystem.js --network localhost",
     "deploy2": "npx hardhat run scripts/deployDonation.js --network localhost",
     "deploy:sepolia": "npx hardhat run scripts/deploy.js --network sepolia",

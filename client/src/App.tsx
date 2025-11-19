@@ -18,8 +18,8 @@ import { mockFriends } from "./components/Friend/mockData";
 import Fr from './views/FrientTest'
 import FriendTest from "./views/FrientTest";
 import FriendPage from "./components/FriendPage";
-import DonationPage from "./components/Donation/DonatePage";
 import DonatePage from "./components/Donate/DonatePage";
+import ListPost from "./components/Post/ListPost";
 function App() {
   return (
     <Routes>
@@ -33,7 +33,8 @@ function App() {
 
       {/* Các route bình thường */}
       <Route path="/" element={<Layout />}>
-        <Route path="feed" element={<Feed />} />
+        {/* <Route path="feed" element={<Feed />} /> */}
+        <Route path="feed" element={<ListPost />} />
         <Route path="connections" element={<Connection />} />
         <Route path="discover" element={<CreateStoryModal onClose={false} />} />
         <Route path="profile" element={<Profile />} />
@@ -41,8 +42,8 @@ function App() {
         <Route path="create-post" element={<CreatePost />} />
         {/* <Route path="addfriend" element={<FriendRequestsPage requests={mockFriendRequests} />} /> */}
         <Route path="friends" element={<FriendsPage/>}/>
-        <Route path="donate" element={<DonationPage/>}/>
         <Route path="donation" element={<DonatePage/>}/>
+        
 
 
         {/* Test */}

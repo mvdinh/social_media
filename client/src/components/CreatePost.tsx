@@ -1,55 +1,39 @@
 import { Image, X, Loader2 } from "lucide-react";
-import React, { useState, useEffect } from "react";
-import { verifySignature } from "../helper/VerifySignature";
-import { uploadToIpfs } from "../helper/UploadToIpfs";
-import { getContract, getCurrentAccount } from "../utils/contractUtils"; // 👈 import từ helper
-import axios from "axios";
+import React, { useEffect, useState } from "react";
+import { uploadTextToIpfs, uploadMultipleFilesToIpfs } from "../helper/UploadToIpfs";
+import { useAuth } from "../context/AuthContext";
+import { toast, Toaster } from "sonner";
 
 const CreatePost = () => {
   const acc = {
     name: "John Warren",
     handle: "@john_warren",
-    avatar:
-      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=40",
+    avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=40",
   };
 
-  // 👇 Tự quản lý user và contract ở đây
-  const [user, setUser] = useState<string | null>(null);
-  const [contract, setContract] = useState<any>(null);
-
+  const { address, contracts } = useAuth();
   const [content, setContent] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [posting, setPosting] = useState(false);
 
-  // 🔹 Load account & contract khi component mount
+  const postContract = contracts["socialMedia"];
+
   useEffect(() => {
-    const init = async () => {
-      try {
-        const account = await getCurrentAccount();
-        if (!account) {
-          alert("Please connect your wallet first!");
-          return;
-        }
-        setUser(account);
+    console.log("postContract", postContract);
+    console.log("address", address);
+  }, [postContract, address]);
 
-        const contractInstance = await getContract();
-        setContract(contractInstance);
-      } catch (err) {
-        console.error("Error loading wallet/contract:", err);
-      }
-    };
-    init();
-  }, []);
-
-  const handleFileChange = (e) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const newFiles = Array.from(e.target.files).slice(0, 4 - files.length);
     
     newFiles.forEach(file => {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setPreviews(prev => [...prev, e.target?.result]);
+        if (e.target?.result) {
+          setPreviews(prev => [...prev, e.target.result as string]);
+        }
       };
       reader.readAsDataURL(file);
     });
@@ -57,102 +41,115 @@ const CreatePost = () => {
     setFiles(prev => [...prev, ...newFiles]);
   };
 
-  const removeFile = (index) => {
+  const removeFile = (index: number) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
     setPreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const createPost = async () => {
-    if (!contract || !content.trim()) {
-      alert('Please write something!');
+    if (!postContract || !content?.trim()) {
+      toast.error('Vui lòng viết nội dung bài viết!');
       return;
     }
 
+    if (!address) {
+      toast.error('Vui lòng kết nối ví!');
+      return;
+    }
+
+    setPosting(true);
+
+    let contentHash = '';
+    let mediaHashes: string[] = [];
+    let mediaType = 0; // 0 = TEXT, 1 = IMAGE, 2 = VIDEO, 3 = MIXED
+
     try {
-      setPosting(true);
-      
-      // === STEP 1: Verify signature ===
-      const { user: verifiedUser, token } = await verifySignature(user);
-      console.log('✅ User authenticated:', verifiedUser.username || verifiedUser.address);
-
-      // === STEP 2: Upload to IPFS ===
-      console.log('📤 Uploading content to IPFS...');
-      const { contentHash, mediaHashes } = await uploadToIpfs(content, user, files);
-      console.log('✅ IPFS upload complete:', { contentHash, mediaHashes });
-
-      const mediaType = mediaHashes.length > 0 ? 1 : 0;
-
-      // === STEP 3: Send transaction to blockchain ===
-      console.log('🔗 Sending transaction to blockchain...');
-      console.log('⏳ Please approve the transaction in MetaMask...');
-
-      let tx;
+      // === STEP 1: Upload text content to IPFS ===
       try {
-        if (mediaHashes && mediaHashes.length > 0) {
-          tx = await contract.createPostWithMedia(contentHash, mediaHashes, mediaType);
+        contentHash = await uploadTextToIpfs(content);
+        console.log('✅ Content CID:', contentHash);
+      } catch (ipfsTextError: any) {
+        console.error('❌ Failed to upload text content:', ipfsTextError);
+        throw new Error(`Không thể tải nội dung lên IPFS: ${ipfsTextError.message || ipfsTextError}`);
+      }
+
+      // === STEP 2: Upload media files to IPFS (if any) ===
+      if (Array.isArray(files) && files.length > 0) {
+        console.log(`📤 Step 2: Uploading ${files.length} media files to IPFS...`);
+        try {
+          mediaHashes = await uploadMultipleFilesToIpfs(files);
+          console.log('✅ Media CIDs:', mediaHashes);
+
+          // Determine media type
+          const hasImage = files.some(f => f.type.startsWith('image/'));
+          const hasVideo = files.some(f => f.type.startsWith('video/'));
+
+          if (hasImage && hasVideo) mediaType = 3; // MIXED
+          else if (hasVideo) mediaType = 2; // VIDEO
+          else mediaType = 1; // IMAGE
+        } catch (ipfsMediaError: any) {
+          console.error('❌ Failed to upload media files:', ipfsMediaError);
+          throw new Error(`Không thể tải media lên IPFS: ${ipfsMediaError.message || ipfsMediaError}`);
+        }
+      }
+
+      // === STEP 3: Create post on blockchain ===
+      console.log('📝 Step 3: Creating post on blockchain...');
+      let tx;
+      
+      try {
+        if (mediaHashes.length > 0) {
+          console.log('Calling createPostWithMedia...');
+          tx = await postContract.createPostWithMedia(contentHash, mediaHashes, mediaType);
         } else {
-          tx = await contract.createPost(contentHash);
+          console.log('Calling createPost...');
+          tx = await postContract.createPost(contentHash);
         }
         console.log('✅ Transaction sent:', tx.hash);
-      } catch (txError) {
+      } catch (txError: any) {
+        console.error('❌ Transaction error:', txError);
+        
         if (txError.code === 'ACTION_REJECTED' || txError.code === 4001) {
-          throw new Error('You rejected the transaction');
+          throw new Error('Bạn đã từ chối giao dịch');
         }
-        throw txError;
+        
+        if (txError.message?.includes('user rejected')) {
+          throw new Error('Giao dịch bị từ chối bởi người dùng');
+        }
+        
+        throw new Error(`Giao dịch thất bại: ${txError.message || 'Lỗi không xác định'}`);
       }
 
       // === STEP 4: Wait for confirmation ===
-      console.log('⏳ Waiting for transaction confirmation...');
+      console.log('⏳ Step 4: Waiting for transaction confirmation...');
       const receipt = await tx.wait();
       console.log('✅ Transaction confirmed in block:', receipt.blockNumber);
+      
+      // Show success toast
+      toast.success('Tạo bài viết thành công!');
 
-      const postData = {
-        txHash: receipt.hash,
-        walletAddress: user,
-        contentHash,
-        mediaHashes: mediaHashes.length > 0 ? mediaHashes : undefined,
-        mediaType,
-      };
+      // Reset form
+      setContent('');
+      setFiles([]);
+      setPreviews([]);
 
-      console.log('📤 Sending data to backend:', postData);
+      // Reload page to show new post
+      setTimeout(() => window.location.reload(), 1500);
 
-      const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/post`,
-        postData,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          timeout: 30000,
-        }
-      );
-
-      console.log('✅ Backend response:', response.data);
-
-      if (response.data.success) {
-        const { blockchainPostId, txHash, dbPostId } = response.data;
-
-        alert(
-          `✅ Post created successfully!\n\n` +
-          `Post ID: ${blockchainPostId}\n` +
-          `Database ID: ${dbPostId}\n` +
-          `Transaction: ${txHash.slice(0, 10)}...${txHash.slice(-8)}`
-        );
-
-        // Reset form
-        setContent('');
-        setFiles([]);
-        setPreviews([]);
-
-        // Reload to show new post
-        setTimeout(() => window.location.reload(), 1500);
-      } else {
-        throw new Error('Backend returned unsuccessful response');
+    } catch (error: any) {
+      console.error('❌ Error creating post (full trace):', error);
+      
+      let errorMessage = 'Không thể tạo bài viết';
+      
+      if (error.message?.includes('IPFS')) {
+        errorMessage = `${error.message}\n\nHãy chắc chắn IPFS Desktop đang chạy!`;
+      } else if (error.message?.includes('từ chối')) {
+        errorMessage = 'Giao dịch đã bị từ chối';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
-
-    } catch (error) {
-      console.error('❌ Error creating post:', error);
-      alert(`Error: ${error.message || 'Failed to create post'}`);
+      
+      toast.error(errorMessage);
     } finally {
       setPosting(false);
     }
@@ -160,6 +157,7 @@ const CreatePost = () => {
 
   return (
     <div className="min-h-screen bg-white md:bg-gray-50 p-4 md:p-8">
+      <Toaster position="top-center" richColors />
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-800">Create Post</h1>
         <p className="text-gray-500 mt-1">Share your thoughts with the world</p>
@@ -174,7 +172,9 @@ const CreatePost = () => {
             className="h-10 w-10 rounded-full object-cover border border-gray-200"
           />
           <div>
-            <p className="text-gray-800 font-semibold text-sm">{user}</p>
+            <p className="text-gray-800 font-semibold text-sm">
+              {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Not connected'}
+            </p>
             <p className="text-gray-500 text-xs">{acc.handle}</p>
           </div>
         </div>
@@ -183,12 +183,12 @@ const CreatePost = () => {
         <div className="py-2">
           <textarea
             className="w-full resize-none border-none focus:outline-none text-gray-700 placeholder-gray-400 text-lg"
-            rows="3"
+            rows={3}
             placeholder="What's happening?"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             disabled={posting}
-          ></textarea>
+          />
         </div>
 
         {/* Image Previews */}
@@ -232,7 +232,7 @@ const CreatePost = () => {
           <div className="relative">
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               multiple
               onChange={handleFileChange}
               className="hidden"
@@ -266,7 +266,6 @@ const CreatePost = () => {
               'Publish Post'
             )}
           </button>
-
         </div>
       </div>
     </div>

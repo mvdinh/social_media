@@ -1,0 +1,30 @@
+{
+  "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "abi": [
+    "event CommentAdded(uint256 indexed,address indexed,string)",
+    "event CommentDeleted(uint256 indexed,uint256,address indexed)",
+    "event PostCreated(uint256 indexed,address indexed,string,uint8)",
+    "event PostDeleted(uint256 indexed,address indexed)",
+    "event PostLiked(uint256 indexed,address indexed)",
+    "event PostUnliked(uint256 indexed,address indexed)",
+    "function addComment(uint256,string)",
+    "function addCommentWithMedia(uint256,string,string)",
+    "function checkIfLiked(uint256,address) view returns (bool)",
+    "function createPost(string) returns (uint256)",
+    "function createPostWithMedia(string,string[],uint8) returns (uint256)",
+    "function deleteComment(uint256,uint256)",
+    "function deletePost(uint256)",
+    "function getComments(uint256) view returns ((address,string,string,uint256,bool)[])",
+    "function getMediaType(uint256) view returns (uint8)",
+    "function getPost(uint256) view returns ((uint256,address,string,string[],uint8,uint256,uint256,bool))",
+    "function getPostMediaHashes(uint256) view returns (string[])",
+    "function getPosts(uint256,uint256) view returns ((uint256,address,string,string[],uint8,uint256,uint256,bool)[])",
+    "function getUserPosts(address) view returns ((uint256,address,string,string[],uint8,uint256,uint256,bool)[])",
+    "function hasLiked(uint256,address) view returns (bool)",
+    "function likePost(uint256)",
+    "function postComments(uint256,uint256) view returns (address,string,string,uint256,bool)",
+    "function postCount() view returns (uint256)",
+    "function posts(uint256) view returns (uint256,address,string,uint8,uint256,uint256,bool)",
+    "function unlikePost(uint256)"
+  ]
+}
