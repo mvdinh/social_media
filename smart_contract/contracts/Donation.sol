@@ -22,6 +22,7 @@ contract Donation {
         uint256 totalDonations; // tổng đã donate (tăng dần)
         uint256 createdAt;
         bool exists;
+        bool archived; // ✅ Trạng thái lưu trữ
     }
 
     struct DonationEntry {
@@ -48,6 +49,8 @@ contract Donation {
         uint256 amount
     );
     event Withdrawn(uint256 indexed postId, address indexed to, uint256 amount);
+    event PostArchived(uint256 indexed postId, address indexed creator);
+    event PostUnarchived(uint256 indexed postId, address indexed creator);
 
     // --- Create a donation post ---
     /// @notice Tạo 1 post để người khác donate vào
@@ -63,7 +66,8 @@ contract Donation {
             balance: 0,
             totalDonations: 0,
             createdAt: block.timestamp,
-            exists: true
+            exists: true,
+            archived: false
         });
 
         emit PostCreated(postId, msg.sender, metadata);
@@ -74,13 +78,14 @@ contract Donation {
     /// @param postId id của post muốn donate
     function donate(uint256 postId) external payable {
         require(postId > 0 && posts[postId].exists, "Post not found");
+        require(!posts[postId].archived, "Post is archived");
         require(msg.value > 0, "Donate amount must be > 0");
 
         // cập nhật trạng thái post
         posts[postId].balance += msg.value;
         posts[postId].totalDonations += msg.value;
 
-        // lưu lịch sử donate
+        // lưu lịch sử donate với địa chỉ ví
         _donationsByPost[postId].push(
             DonationEntry({
                 donor: msg.sender,
@@ -90,6 +95,35 @@ contract Donation {
         );
 
         emit Donated(postId, msg.sender, msg.value);
+    }
+
+    // --- Archive/Unarchive post (only creator) ---
+    /// @notice Creator lưu trữ chiến dịch
+    /// @param postId id của post
+    function archivePost(uint256 postId) external {
+        require(postId > 0 && posts[postId].exists, "Post not found");
+        require(
+            msg.sender == posts[postId].creator,
+            "Only creator can archive"
+        );
+        require(!posts[postId].archived, "Post already archived");
+
+        posts[postId].archived = true;
+        emit PostArchived(postId, msg.sender);
+    }
+
+    /// @notice Creator khôi phục chiến dịch từ lưu trữ
+    /// @param postId id của post
+    function unarchivePost(uint256 postId) external {
+        require(postId > 0 && posts[postId].exists, "Post not found");
+        require(
+            msg.sender == posts[postId].creator,
+            "Only creator can unarchive"
+        );
+        require(posts[postId].archived, "Post is not archived");
+
+        posts[postId].archived = false;
+        emit PostUnarchived(postId, msg.sender);
     }
 
     // --- Withdraw (only post creator) ---
@@ -137,14 +171,24 @@ contract Donation {
         uint256 index
     ) external view returns (address donor, uint256 amount, uint256 timestamp) {
         require(postId > 0 && posts[postId].exists, "Post not found");
+        require(index < _donationsByPost[postId].length, "Index out of bounds");
         DonationEntry storage d = _donationsByPost[postId][index];
         return (d.donor, d.amount, d.timestamp);
+    }
+
+    /// @notice Lấy tất cả donations của một post (dùng cho view - tốn gas nếu gọi từ transaction)
+    function getAllDonations(
+        uint256 postId
+    ) external view returns (DonationEntry[] memory) {
+        require(postId > 0 && posts[postId].exists, "Post not found");
+        return _donationsByPost[postId];
     }
 
     // Fallback/receive để tránh gửi ETH nhầm (nếu muốn)
     receive() external payable {
         revert("Send via donate(postId)");
     }
+
     function getTotalPosts() external view returns (uint256) {
         return _nextPostId - 1;
     }

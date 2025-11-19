@@ -19,6 +19,7 @@ import Fr from './views/FrientTest'
 import FriendTest from "./views/FrientTest";
 import FriendPage from "./components/FriendPage";
 import DonationPage from "./components/Donation/DonatePage";
+import DonatePage from "./components/Donate/DonatePage";
 function App() {
   return (
     <Routes>
@@ -40,7 +41,8 @@ function App() {
         <Route path="create-post" element={<CreatePost />} />
         {/* <Route path="addfriend" element={<FriendRequestsPage requests={mockFriendRequests} />} /> */}
         <Route path="friends" element={<FriendsPage/>}/>
-        <Route path="donation" element={<DonationPage/>}/>
+        <Route path="donate" element={<DonationPage/>}/>
+        <Route path="donation" element={<DonatePage/>}/>
 
 
         {/* Test */}
