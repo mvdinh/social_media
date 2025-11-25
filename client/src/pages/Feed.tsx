@@ -9,11 +9,12 @@
   } from "lucide-react";
   import {
     assets,
-    dummyStoriesData,
     dummyPostsData,
     dummyRecentMessagesData,
   } from "../assets/assets";
   import CreateStoryModal from "./CreateStory";
+
+  import StoryViewerModal from '../components/StoryViewerModal';
 
   // -----------------------------------------------------------------
   // 1. Story Card
@@ -200,8 +201,9 @@
     // 1. Tạo state để lưu trữ stories
     const [stories, setStories] = useState([]);
     const [isLoadingStories, setIsLoadingStories] = useState(true);
-
     const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
+
+    const [viewingStoryIndex, setViewingStoryIndex] = useState(null);
 
     // 2. Dùng useEffect để gọi API khi component được render
     useEffect(() => {
@@ -227,6 +229,39 @@
       fetchStories(); // Gọi hàm fetch
     }, [isCreateStoryOpen]); // isCreateStoryOpen để auto-refresh
 
+    // HÀM XEM STORY CHI TIẾT
+    const handleViewStory = async (storyMetadata) => {
+        // Tìm index của story được click
+        const index = stories.findIndex(s => s.ipfsHash === storyMetadata.ipfsHash);
+        if (index !== -1) {
+            setViewingStoryIndex(index);
+        } else {
+             console.error("Story not found in the current list.");
+        }
+    };
+
+    // HÀM ĐÓNG MODAL
+    const handleCloseViewer = () => {
+        setViewingStoryIndex(null);
+    };
+
+    // 💡 HÀM CHUYỂN STORY TIẾP THEO
+    const handleNextStory = () => {
+        if (viewingStoryIndex !== null && viewingStoryIndex < stories.length - 1) {
+            setViewingStoryIndex(viewingStoryIndex + 1);
+        }
+    };
+
+    // 💡 HÀM CHUYỂN STORY TRƯỚC
+    const handlePrevStory = () => {
+        if (viewingStoryIndex !== null && viewingStoryIndex > 0) {
+            setViewingStoryIndex(viewingStoryIndex - 1);
+        }
+    };
+
+    // 💡 Lấy Story hiện tại từ Index
+    const currentStory = viewingStoryIndex !== null ? stories[viewingStoryIndex] : null;
+
     return (
       <div className="bg-gray-50 min-h-screen ">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-6 p-4">
@@ -247,6 +282,7 @@
                     type={story.type}
                     content={story.content}
                     backgroundColor={story.backgroundColor}
+                    onClick={() => handleViewStory(story)}
                   />
                 ))}
               </div>
@@ -269,6 +305,17 @@
         {isCreateStoryOpen && (
           <CreateStoryModal onClose={() => setIsCreateStoryOpen(false)} />
         )}
+
+        {currentStory && (
+            <StoryViewerModal 
+                story={currentStory} // Story hiện tại
+                onClose={handleCloseViewer} 
+                stories={stories} 
+                currentIndex={viewingStoryIndex} 
+                onNext={handleNextStory} 
+                onPrev={handlePrevStory} 
+            />
+        )}
 
       </div>
     );

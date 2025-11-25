@@ -80,24 +80,24 @@ router.post("/post", upload.single("storyFile"),async (req, res) => {
     const file = req.file;
 
     if (!owner || !type) {
-      return res.status(400).json({ error: "filePath and owner are required" });
+      return res.status(400).json({ error: "Type and owner are required" });
     }
 
     let ipfsHash;
 
-    if (type === "Photo") {
+    if (type === "Photo" || type === "Video") {
       if (!file) {
-        return res.status(400).json({ error: "File (storyFile) is required for Photo type" });
+        return res.status(400).json({ error: "File (storyFile) is required for Photo or Video type" });
       }
       const metadata = {
         name: `Story by ${owner} at ${timestamp}`,
         keyvalues: {
           owner,
           timestamp,
-          type: "story-photo",
+          type: (type === "Video" ? "story-video" : "story-photo"),
         },
       };
-      const ipfsHash = await uploadToIPFS(file.path, metadata);
+      ipfsHash = await uploadToIPFS(file.path, metadata);
     
       //Xóa file tạm trên server sau khi đã upload lên IPFS
       fs.unlinkSync(file.path);

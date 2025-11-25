@@ -1,7 +1,6 @@
 import CreatePost from "./pages/CreatePost";
 
 import Connection from "./pages/Connections";
-import Discover from "./pages/Discover";
 import Profile from "./pages/Profile";
 
 import { Route, Routes } from "react-router-dom";
@@ -9,9 +8,11 @@ import Feed from "./pages/Feed";
 import Layout from "./pages/Layout";
 import CreateStoryModal from "./pages/CreateStory";
 
+import WalletProvider from "./wallet/WalletProvider";
+
 function App() {
   return (
-    <>
+    <WalletProvider>
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Feed />} />
@@ -27,7 +28,7 @@ function App() {
           <Route path="create-post" element={<CreatePost />} />
         </Route>
       </Routes>
-    </>
+    </WalletProvider>
   );
 }
 

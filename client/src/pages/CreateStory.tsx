@@ -1,7 +1,18 @@
   import React, { useState, useEffect, useRef } from "react";
   import { ArrowLeft, Edit3, Image as ImageIcon, Star } from "lucide-react";
 
+  import useWallet from '../wallet/useWallet';
+
+  const MAX_VIDEO_DURATION_SECONDS = 60; // giới hạn thời lượng video
+
   const CreateStoryModal = ({ onClose }) => {
+    // Lấy trạng thái ví và hàm postStory từ Context
+    const { 
+        currentAccount, 
+        postStory, 
+        connectWallet 
+    } = useWallet();
+
     const colorPalette = [
       "bg-blue-600",
       "bg-purple-600",
@@ -10,6 +21,8 @@
       "bg-green-500",
       "bg-teal-500",
     ];
+
+    const [statusMessage, setStatusMessage] = useState<string | null>(null);
     //quản lý state
     const [storyText, setStoryText] = useState("");
     const [selectedColor, setSelectedColor] = useState("bg-purple-600"); // Mặc định màu tím như ảnh
@@ -23,8 +36,14 @@
     //Tạo ref cho input[type=file] bị ẩn
     const fileInputRef = useRef<HTMLInputElement>(null);
     
+    // Tạo ref mới cho thẻ video
+    const videoRef = useRef<HTMLVideoElement>(null);
+    
     const baseButtonClass =
       "flex items-center justify-center py-2 px-4 rounded-lg font-semibold text-sm transition duration-150";
+    
+    const isVideo = selectedFile && selectedFile.type.startsWith('video/');
+    const isImage = selectedFile && selectedFile.type.startsWith('image/');
     
     //Hàm này được gọi khi bấm nút "Photo/Video"
     const handlePhotoUploadClick = () => {
@@ -38,32 +57,76 @@
       const file = event.target.files?.[0]; // Lấy file đầu tiên
 
       if (file) {
-        setSelectedFile(file); // Lưu file vào state
-        setStoryType("Photo"); // Tự động chuyển sang chế độ Photo
+        if (file.type.startsWith('video/')) {
+            const videoElement = document.createElement('video');
+            videoElement.preload = 'metadata'; // Chỉ tải metadata
 
-        // Tạo một URL tạm thời để hiển thị preview ảnh
-        const previewUrl = URL.createObjectURL(file);
-        setFilePreview(previewUrl);
+            videoElement.onloadedmetadata = function() {
+                window.URL.revokeObjectURL(videoElement.src); // Dọn dẹp URL tạm thời
+
+                // ✅ 1.1: KIỂM TRA THỜI LƯỢNG
+                if (videoElement.duration > MAX_VIDEO_DURATION_SECONDS) {
+                    alert(`Video quá dài (${videoElement.duration.toFixed(1)}s). Chỉ cho phép video dưới ${MAX_VIDEO_DURATION_SECONDS} giây.`);
+                    
+                    // Reset input để người dùng chọn lại
+                    event.target.value = '';
+                    setSelectedFile(null);
+                    setFilePreview(null);
+                    return; 
+                } else {
+                    // ✅ 1.2: VIDEO HỢP LỆ (Dưới 60s)
+                    setSelectedFile(file);
+                    setStoryType("Video");
+                    if (filePreview) URL.revokeObjectURL(filePreview);
+                    const previewUrl = URL.createObjectURL(file);
+                    setFilePreview(previewUrl);
+                }
+            };
+            
+            // Kích hoạt onloadedmetadata bằng cách gán file URL
+            videoElement.src = URL.createObjectURL(file);
+            
+        } else {
+          setSelectedFile(file); // Lưu file vào state
+          setStoryType("Photo"); // Tự động chuyển sang chế độ Photo
+          if (filePreview) URL.revokeObjectURL(filePreview); // Cleanup cũ nếu có
+          // Tạo một URL tạm thời để hiển thị preview ảnh
+          const previewUrl = URL.createObjectURL(file);
+          setFilePreview(previewUrl);
+        }
       }
     };
 
     // Xử lý submit tạo story
     const handleSubmit = async () => {
       if (isLoading) return;
+      setStatusMessage(null);
 
+      // KIỂM TRA KẾT NỐI VÍ TRƯỚC
+      if (!currentAccount) {
+          setStatusMessage("⚠️ Vui lòng kết nối ví MetaMask trước khi đăng Story.");
+          await connectWallet(); // Thử kết nối nếu chưa có
+          return;
+      }
+      
       if (
         (storyType === "Text" && storyText.trim() === "") ||
-        (storyType === "Photo" && !selectedFile)
+        (storyType === "Photo" && !selectedFile) ||
+        (storyType === "Video" && !selectedFile)
       ) return; // Không làm gì nếu không hợp lệ
       
       setIsLoading(true); 
 
       const formData = new FormData();
-      formData.append("owner", "your_username_here"); // <-- Cung cấp tên người dùng
+      formData.append("owner", currentAccount); // <-- Cung cấp tên người dùng
       formData.append("timestamp", Date.now().toString());
 
       try {
-        if (storyType === "Photo") {
+        if (storyType === "Video") {
+          // ---  XỬ LÝ UPLOAD video ---
+          formData.append("type", "Video");
+          formData.append("storyFile", selectedFile!); // Key này phải khớp với API (upload.single("storyFile"))
+        } else if (storyType === "Photo") {
           // ---  XỬ LÝ UPLOAD ẢNH ---
           formData.append("type", "Photo");
           formData.append("storyFile", selectedFile!); // Key này phải khớp với API (upload.single("storyFile"))
@@ -78,28 +141,48 @@
             method: "POST",
             body: formData,
           });
+          
+          const data = await response.json();
 
-          if (!response.ok) {
+          if (!response.ok || !data.ipfsHash) {
             throw new Error("Tải ảnh lên thất bại.");
           }
 
+          const txHash = await postStory(data.ipfsHash);
+
         // Đóng modal sau khi thành công
         onClose();
-      } catch (error) {
-        console.error("Error creating story:", error);
+  
+      } catch (error: any) {
+          console.error("Error creating story:", error);
+          if (error.code === 4001) {
+                setStatusMessage("❌ Giao dịch bị người dùng từ chối trên MetaMask.");
+          } else {
+                setStatusMessage(`❌ Lỗi giao dịch: ${error.message || "Không xác định"}`);
+          }
       } finally {
-        setIsLoading(false);
+          setIsLoading(false);
       }
     }
 
     // Hàm cleanup này sẽ chạy khi component bị hủy
     useEffect(() => {
+      if (isVideo && videoRef.current && filePreview) {
+          // Đặt lại source và cố gắng phát
+          videoRef.current.src = filePreview;
+          videoRef.current.load();
+          videoRef.current.play().catch(error => {
+                // Lỗi thường xảy ra nếu người dùng chưa tương tác với trang
+                console.warn("Video play was prevented by browser:", error);
+          });
+      }
+
       return () => {
         if (filePreview) {
           URL.revokeObjectURL(filePreview);
         }
       };
-    }, [filePreview]);
+    }, [filePreview, isVideo]); // Chạy khi filePreview hoặc isVideo thay đổi
 
     return (
       <div className="fixed inset-0 z-50 bg-black/50  flex items-center justify-center p-4">
@@ -139,11 +222,26 @@
               ) : (
                 filePreview ? (
                   // Hiển thị preview ảnh/video đã chọn
+                  isVideo ? (
+                     <video
+                        ref={videoRef}
+                        src={filePreview}
+                        //controls
+                        //autoPlay
+                        loop
+                        muted // Mute để tự động phát
+                        className="h-full w-full object-contain rounded-lg"
+                     />
+                  ) : isImage ? (
                   <img
                     src={filePreview}
                     alt="Story preview"
                     className="h-full w-full object-contain rounded-lg" // 'object-contain' để ảnh không bị vỡ
                   />
+                  ) : (
+                    // Fallback nếu có lỗi file
+                    <p className="text-white">Unsupported file type selected.</p>
+                  )
                 ) : (
                   <div className="flex flex-col items-center justify-center text-white/80">
                     <ImageIcon className="h-16 w-16 mb-4" />
@@ -201,6 +299,12 @@
                 Photo/Video
               </button>
             </div>
+
+            {statusMessage && (
+                <p className={`text-center mb-3 text-sm font-medium ${statusMessage.startsWith('❌') ? 'text-red-500' : statusMessage.startsWith('✅') ? 'text-green-500' : 'text-gray-600'}`}>
+                    {statusMessage}
+                </p>
+            )}
 
             <button
               onClick={handleSubmit}

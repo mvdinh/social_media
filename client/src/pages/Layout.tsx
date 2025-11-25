@@ -7,8 +7,15 @@ import Sidebar from "../components/Sidebar";
 import NotificationPanel from "./Notification";
 import UserMenuDropdown from "./UserMenuDrop";
 import { dummyFollowersData } from "../assets/assets";
+import useWallet from '../wallet/useWallet';
 
 const Layout = () => {
+  const { 
+        currentAccount, 
+        connectWallet, 
+        isLoading 
+    } = useWallet();
+
   const [isChatListOpen, setIsChatListOpen] = useState(false);
   const [isNotification, setisNotification] = useState(false);
   const [isUser, setisUser] = useState(false);
@@ -17,14 +24,17 @@ const Layout = () => {
   const handleChatListToggle = () => {
     setIsChatListOpen((prev) => !prev);
     setisNotification(false);
+    setisUser(false);
   };
   const handleNotification = () => {
     setisNotification((prev) => !prev);
     setIsChatListOpen(false);
+    setisUser(false);
   };
   const handleUser = () => {
     setisUser((prev) => !prev);
     setIsChatListOpen(false);
+    setisNotification(false);
   };
   const handleChatSelect = (user) => {
     setPopupChatUser(user);
