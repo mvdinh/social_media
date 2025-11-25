@@ -18,7 +18,6 @@ async function main() {
   // =========================
   // Lưu ABI + Address cho backend + frontend
   // =========================
-  const backendConfPath = path.join(__dirname, "../../backend/src/bloc/acc.json");
   const frontendConfPath = path.join(__dirname, "../../client/src/bloc/acc.json");
 
   
@@ -31,10 +30,8 @@ async function main() {
     abi
   };
 
-  fs.mkdirSync(path.dirname(backendConfPath), { recursive: true });
   fs.mkdirSync(path.dirname(frontendConfPath), { recursive: true });
 
-  fs.writeFileSync(backendConfPath, JSON.stringify(data, null, 2));
   fs.writeFileSync(frontendConfPath, JSON.stringify(data, null, 2));
 
   console.log("📦 ABI + address saved for backend & frontend");
@@ -44,3 +41,4 @@ main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
+

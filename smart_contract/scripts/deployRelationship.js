@@ -18,7 +18,6 @@ async function main() {
   // =========================
   // Lưu ABI + Address cho backend + frontend
   // =========================
-  const backendConfPath = path.join(__dirname, "../../backend/src/bloc/relationship.json");
   const frontendConfPath = path.join(__dirname, "../../client/src/bloc/relationship.json");
 
   // ethers 6.x: abi có thể trả về string hoặc array, parse cho chắc
@@ -30,10 +29,8 @@ async function main() {
     abi
   };
 
-  fs.mkdirSync(path.dirname(backendConfPath), { recursive: true });
   fs.mkdirSync(path.dirname(frontendConfPath), { recursive: true });
 
-  fs.writeFileSync(backendConfPath, JSON.stringify(data, null, 2));
   fs.writeFileSync(frontendConfPath, JSON.stringify(data, null, 2));
 
   console.log("📦 ABI + address saved for backend & frontend");

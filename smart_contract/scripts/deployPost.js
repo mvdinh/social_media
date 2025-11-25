@@ -20,11 +20,6 @@ async function main() {
   // ============================
   // Save ABI + Address cho backend + frontend
   // ============================
-
-  const backendConfPath = path.join(
-    __dirname,
-    "../../backend/src/bloc/socialMedia.json"
-  );
   const frontendConfPath = path.join(
     __dirname,
     "../../client/src/bloc/socialMedia.json"
@@ -40,12 +35,9 @@ async function main() {
     abi,
   };
 
-  // Tạo folder nếu chưa tồn tại
-  fs.mkdirSync(path.dirname(backendConfPath), { recursive: true });
   fs.mkdirSync(path.dirname(frontendConfPath), { recursive: true });
 
   // Ghi file JSON
-  fs.writeFileSync(backendConfPath, JSON.stringify(data, null, 2));
   fs.writeFileSync(frontendConfPath, JSON.stringify(data, null, 2));
 
   console.log("📦 ABI + address saved to backend & frontend");

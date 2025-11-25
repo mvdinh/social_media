@@ -21,10 +21,6 @@ async function main() {
   // Save ABI + Address cho backend + frontend
   // ============================
 
-  const backendConfPath = path.join(
-    __dirname,
-    "../../backend/src/bloc/donate.json"
-  );
   const frontendConfPath = path.join(
     __dirname,
     "../../client/src/bloc/donate.json"
@@ -41,11 +37,9 @@ async function main() {
   };
 
   // Ensure folders exist
-  fs.mkdirSync(path.dirname(backendConfPath), { recursive: true });
   fs.mkdirSync(path.dirname(frontendConfPath), { recursive: true });
 
   // Save JSON files
-  fs.writeFileSync(backendConfPath, JSON.stringify(data, null, 2));
   fs.writeFileSync(frontendConfPath, JSON.stringify(data, null, 2));
 
   console.log("📦 ABI + address saved to backend & frontend");
