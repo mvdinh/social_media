@@ -77,6 +77,15 @@ const Navbar = ({ onMessageClick, onNotification, onUser }) => {
             </Link>
 
             {/* Friends */}
+            <Link to="/friends/requests" className="flex items-center justify-center relative group px-4">
+              <Users className={isActive("/friends/requests") ? activeIconClass : iconClass} />
+              <div
+                className={`absolute bottom-0 w-full h-1 rounded-t-sm transition duration-150 ${
+                  isActive("/friends/requests") ? "bg-blue-600" : "bg-transparent group-hover:bg-gray-200"
+                }`}
+              ></div>
+            </Link>
+            {/* Friends */}
             <Link to="/friends" className="flex items-center justify-center relative group px-4">
               <Users className={isActive("/friends") ? activeIconClass : iconClass} />
               <div

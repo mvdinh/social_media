@@ -10,16 +10,15 @@ import PostFeed from "./Test/ListPosts";
 import CreatePost from "./components/CreatePost"
 
 //  
-import { mockFriendRequests } from "./components/Friend/mockData";
 
-import FriendsPage  from "./components/ListFriend/FriendsPage";
-import { mockFriends } from "./components/Friend/mockData";
+import FriendsPage  from "./components/Relationship/FriendsPage";
 
 import Fr from './views/FrientTest'
 import FriendTest from "./views/FrientTest";
 import FriendPage from "./components/FriendPage";
 import DonatePage from "./components/Donate/DonatePage";
 import ListPost from "./components/Post/ListPost";
+import FriendsListPage from "./components/Friend/FriendListPage";
 function App() {
   return (
     <Routes>
@@ -41,7 +40,8 @@ function App() {
         <Route path="profile/:profileId" element={<Profile />} />
         <Route path="create-post" element={<CreatePost />} />
         {/* <Route path="addfriend" element={<FriendRequestsPage requests={mockFriendRequests} />} /> */}
-        <Route path="friends" element={<FriendsPage/>}/>
+        <Route path="friends/requests" element={<FriendsPage/>}/>
+        <Route path="friends" element={<FriendsListPage/>}/>
         <Route path="donation" element={<DonatePage/>}/>
         
 
