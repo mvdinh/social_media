@@ -1,7 +1,7 @@
 import { Image, X, Loader2 } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { uploadTextToIpfs, uploadMultipleFilesToIpfs } from "../helper/UploadToIpfs";
-import { useAuth } from "../context/AuthContext";
+import { uploadTextToIpfs, uploadMultipleFilesToIpfs } from "../../helper/UploadToIpfs";
+import { useAuth } from "../../context/AuthContext";
 import { toast, Toaster } from "sonner";
 
 const CreatePost = () => {
