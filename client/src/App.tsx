@@ -8,33 +8,50 @@ import Layout from "./pages/Layout";
 import CreateStoryModal from "./pages/CreateStory";
 import PostFeed from "./Test/ListPosts";
 
-import CreatePost from "./components/Post/CreatePost"
-import FriendsPage  from "./components/Relationship/FriendsPage";
+import CreatePost from "./components/Post/CreatePost";
+import FriendsPage from "./components/Relationship/FriendsPage";
 import DonatePage from "./components/Donate/DonatePage";
 import ListPost from "./components/Post/ListPost";
-import FriendsListPage from "./components/Friend/FriendListPage"
+import FriendsListPage from "./components/Friend/FriendListPage";
+
+import GroupPage from "./components/Groups/GroupPage";
+import JoinPage from "./components/Groups/JoinPage/JoinPage";
+import CreateGroupModal from "./components/Groups/CreateGroupModal";
+import GroupFeed from "./components/Groups/GroupFeed";
+import GroupDetail from "./components/Groups/GroupDetail";
 
 function App() {
   return (
     <Routes>
-    
-      {/* Mặc định mở app là /login */}
+
+      {/* Redirect mặc định */}
       <Route path="/" element={<Navigate to="/login" />} />
 
-      {/* Trang login */}
+      {/* Login */}
       <Route path="/login" element={<Login />} />
 
+      {/* Layout chính */}
       <Route path="/" element={<Layout />}>
+
         <Route path="feed" element={<ListPost />} />
-        <Route path="connections" element={<Connection />} />
+        <Route path="groups" element={<Connection />} />  {/* cái này hình như cũ rồi */}
         <Route path="discover" element={<CreateStoryModal onClose={false} />} />
         <Route path="profile" element={<Profile />} />
         <Route path="profile/:profileId" element={<Profile />} />
         <Route path="create-post" element={<CreatePost />} />
-        <Route path="friends/requests" element={<FriendsPage/>}/>
-        <Route path="friends" element={<FriendsListPage/>}/>
-        <Route path="donation" element={<DonatePage/>}/>
-     </Route>
+        <Route path="friends/requests" element={<FriendsPage />} />
+        <Route path="friends" element={<FriendsListPage />} />
+        <Route path="donation" element={<DonatePage />} />
+
+        {/* ✅ Route nhóm (KHÔNG cần LayoutGroup) */}
+        <Route path="groups">
+          {/* <Route path="feed" element={<GroupPage />} /> */}
+          <Route path="joins" element={<JoinPage />} />
+          <Route path="create" element={<CreateGroupModal/>} />
+          <Route path=":id" element={<GroupDetail/>} />
+        </Route>
+
+      </Route>
     </Routes>
   );
 }
