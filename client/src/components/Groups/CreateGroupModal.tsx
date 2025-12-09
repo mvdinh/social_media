@@ -51,57 +51,73 @@ const CreateGroupPage = () => {
     }
 
     setIsCreating(true);
-    const loadingToast = toast.loading('Đang tạo nhóm...');
+    const loadingToast = toast.loading('Đang chuẩn bị tạo nhóm...');
 
     try {
+      // BƯỚC 1: Upload tên nhóm lên IPFS (CID của text)
+      toast.loading('📝 Đang mã hóa tên nhóm lên IPFS...', { id: loadingToast });
+      const nameCID = await uploadTextToIpfs(groupName.trim());
+      console.log('✅ Name CID:', nameCID);
+
+      // BƯỚC 2: Upload mô tả lên IPFS (CID của text)
+      toast.loading('📝 Đang mã hóa mô tả lên IPFS...', { id: loadingToast });
+      const descCID = description.trim() 
+        ? await uploadTextToIpfs(description.trim())
+        : await uploadTextToIpfs('Không có mô tả'); // Fallback nếu không có mô tả
+      console.log('✅ Description CID:', descCID);
+
+      // BƯỚC 3: Upload ảnh lên IPFS (nếu có)
       let coverImageCID = '';
       if (imageFile) {
-        toast.loading('Đang tải ảnh lên IPFS...', { id: loadingToast });
+        toast.loading('🖼️ Đang tải ảnh lên IPFS...', { id: loadingToast });
         coverImageCID = await uploadFileToIpfs(imageFile);
-        console.log('✅ Image uploaded to IPFS:', coverImageCID);
+        console.log('✅ Cover Image CID:', coverImageCID);
+      } else {
+        // Nếu không có ảnh, upload một placeholder text
+        coverImageCID = await uploadTextToIpfs('no-image');
+        console.log('✅ Using placeholder CID for no image');
       }
 
-      const metadata = {
-        name: groupName.trim(),
-        description: description.trim(),
-        coverImage: coverImageCID,
-        createdAt: Date.now(),
-        creator: address
-      };
-
-      toast.loading('Đang lưu thông tin nhóm lên IPFS...', { id: loadingToast });
-      const metadataJSON = JSON.stringify(metadata);
-      const metadataCID = await uploadTextToIpfs(metadataJSON);
-      console.log('✅ Metadata uploaded to IPFS:', metadataCID);
-
+      // BƯỚC 4: Tạo nhóm trên blockchain với các CID
       const groupType = privacy === 'public' ? 0 : 1;
 
-      toast.loading('Đang tạo nhóm trên blockchain...', { id: loadingToast });
-      const tx = await groupContract.createGroup(
-        groupName.trim(),
-        description.trim(),
+      toast.loading('⛓️ Đang tạo nhóm trên blockchain...', { id: loadingToast });
+      console.log('📡 Sending transaction with:', {
+        nameCID,
+        descCID,
         groupType,
         autoApprove,
-        metadataCID
+        coverImageCID
+      });
+
+      const tx = await groupContract.createGroup(
+        nameCID,        // CID của name
+        descCID,        // CID của description
+        groupType,
+        autoApprove,
+        coverImageCID   // CID của ảnh
       );
 
       console.log('📝 Transaction sent:', tx.hash);
-      toast.loading('Đang chờ xác nhận...', { id: loadingToast });
+      toast.loading('⏳ Đang chờ xác nhận giao dịch...', { id: loadingToast });
+      
       const receipt = await tx.wait();
       console.log('✅ Transaction confirmed:', receipt);
 
+      // Lấy groupId từ event
       const event = receipt.events?.find((e: any) => e.event === 'GroupCreated');
       const groupId = event?.args?.groupId?.toString();
 
+      console.log('🎉 Group created with ID:', groupId);
       toast.success('Tạo nhóm thành công! 🎉', { id: loadingToast });
 
-      setTimeout(() => {
-        if (groupId) {
-          navigate(`/groups/${groupId}`);
-        } else {
-          navigate('/groups');
-        }
-      }, 1500);
+      if (groupId) {
+  setTimeout(() => {
+    navigate(`/groups/joins`);
+  }, 1500);
+}
+
+
     } catch (error: any) {
       console.error('❌ Error creating group:', error);
       let errorMessage = 'Tạo nhóm thất bại';
@@ -114,6 +130,8 @@ const CreateGroupPage = () => {
         errorMessage = 'Không thể kết nối IPFS. Vui lòng kiểm tra IPFS Desktop';
       } else if (error.reason) {
         errorMessage = error.reason;
+      } else if (error.message) {
+        errorMessage = error.message;
       }
 
       toast.error(errorMessage, { id: loadingToast });

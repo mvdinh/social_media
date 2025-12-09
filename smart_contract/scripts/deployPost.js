@@ -22,7 +22,7 @@ async function main() {
   // ============================
   const frontendConfPath = path.join(
     __dirname,
-    "../../client/src/bloc/socialMedia.json"
+    "../../client/src/contracts/socialMedia.json"
   );
 
   // Lấy ABI đúng chuẩn ethers v6

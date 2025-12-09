@@ -18,7 +18,7 @@ async function main() {
   // =========================
   // Lưu ABI + Address cho backend + frontend
   // =========================
-  const frontendConfPath = path.join(__dirname, "../../client/src/bloc/acc.json");
+  const frontendConfPath = path.join(__dirname, "../../client/src/contracts/acc.json");
 
   
   // ethers 6.x: abi có thể trả về string hoặc array, parse cho chắc

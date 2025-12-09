@@ -23,7 +23,7 @@ async function main() {
 
   const frontendConfPath = path.join(
     __dirname,
-    "../../client/src/bloc/group.json" // đổi donate.json → group.json
+    "../../client/src/contracts/group.json" // đổi donate.json → group.json
   );
 
   // ethers 6.x: format ABI

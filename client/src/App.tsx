@@ -8,10 +8,9 @@ import Layout from "./pages/Layout";
 import CreateStoryModal from "./pages/CreateStory";
 import PostFeed from "./Test/ListPosts";
 
-import CreatePost from "./components/Post/CreatePost";
 import FriendsPage from "./components/Relationship/FriendsPage";
 import DonatePage from "./components/Donate/DonatePage";
-import ListPost from "./components/Post/ListPost";
+
 import FriendsListPage from "./components/Friend/FriendListPage";
 
 import GroupPage from "./components/Groups/GroupPage";
@@ -19,6 +18,7 @@ import JoinPage from "./components/Groups/JoinPage/JoinPage";
 import CreateGroupModal from "./components/Groups/CreateGroupModal";
 import GroupFeed from "./components/Groups/GroupFeed";
 import GroupDetail from "./components/Groups/GroupDetail";
+import ListPostPage from "./pages/ListPostPage";
 
 function App() {
   return (
@@ -33,12 +33,11 @@ function App() {
       {/* Layout chính */}
       <Route path="/" element={<Layout />}>
 
-        <Route path="feed" element={<ListPost />} />
+        <Route path="feed" element={<ListPostPage/>} />
         <Route path="groups" element={<Connection />} />  {/* cái này hình như cũ rồi */}
         <Route path="discover" element={<CreateStoryModal onClose={false} />} />
         <Route path="profile" element={<Profile />} />
         <Route path="profile/:profileId" element={<Profile />} />
-        <Route path="create-post" element={<CreatePost />} />
         <Route path="friends/requests" element={<FriendsPage />} />
         <Route path="friends" element={<FriendsListPage />} />
         <Route path="donation" element={<DonatePage />} />

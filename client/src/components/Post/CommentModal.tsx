@@ -1,7 +1,8 @@
 import React from 'react';
 import { ThumbsUp, MessageCircle, X, Send, Smile } from 'lucide-react';
-// Import type từ ListPost để đảm bảo đồng bộ
+
 import { Post } from './ListPost';
+import { getTimeAgo } from '../../utils/getTimeAgo';
 
 interface CommentModalProps {
   post: Post;
@@ -128,17 +129,6 @@ export function CommentModal({
     }
   };
 
-  const formatTimestamp = (timestamp: number): string => {
-    const now = Math.floor(Date.now() / 1000);
-    const diff = now - timestamp;
-
-    if (diff < 60) return `${diff} giây trước`;
-    if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)} ngày trước`;
-    return new Date(timestamp * 1000).toLocaleDateString('vi-VN');
-  };
-
   return (
     <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl">
@@ -180,25 +170,28 @@ export function CommentModal({
 
           {/* Post Stats & Action inside Modal */}
           <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-gray-600 text-sm font-medium">{post.likes} lượt thích</span>
-              <span className="text-gray-600 text-sm font-medium">{post.comments.length} bình luận</span>
-            </div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-gray-600 text-sm font-medium">{post.likes} lượt thích</span>
+                  <span className="text-gray-600 text-sm font-medium">{post.comments.length} bình luận</span>
+                </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between px-4">
               <button
                 onClick={() => onLike(post.id)}
                 disabled={!userAddress}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white transition-colors ${
-                  post.isLiked ? 'text-blue-600 font-medium' : 'text-gray-600'
-                } ${!userAddress ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg transition-all duration-200 ${
+                  post.isLiked 
+                    ? 'text-blue-600 font-medium bg-blue-50 hover:bg-blue-100' 
+                    : 'text-gray-600 hover:bg-white'
+                } ${!userAddress ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
               >
-                <ThumbsUp className={`w-5 h-5 ${post.isLiked ? 'fill-current' : ''}`} />
-                <span>Thích</span>
+                <ThumbsUp className={`w-5 h-5 ${post.isLiked ? 'fill-blue-600' : ''}`} />
+                <span className="text-sm font-medium">Thích</span>
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white text-gray-600 transition-colors">
+
+              <button className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-gray-600 hover:bg-white transition-all duration-200 cursor-pointer">
                 <MessageCircle className="w-5 h-5" />
-                <span>Bình luận</span>
+                <span className="text-sm font-medium">Bình luận</span>
               </button>
             </div>
           </div>
@@ -227,7 +220,7 @@ export function CommentModal({
                       </div>
                       <div className="flex items-center gap-4 mt-1 px-2">
                         <span className="text-xs text-gray-500">
-                          {formatTimestamp(comment.timestamp)}
+                          {getTimeAgo(comment.timestamp)}
                         </span>
                       </div>
                     </div>

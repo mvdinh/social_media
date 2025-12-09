@@ -23,7 +23,7 @@ async function main() {
 
   const frontendConfPath = path.join(
     __dirname,
-    "../../client/src/bloc/donate.json"
+    "../../client/src/contracts/donate.json"
   );
 
   // ethers 6.x: format abi

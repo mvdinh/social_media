@@ -4,7 +4,7 @@ import { ethers } from "ethers";
 
 // 🟦 Auto load all contract JSON files
 function loadAllContracts() {
-  const modules = import.meta.glob("../bloc/*.json", { eager: true });
+  const modules = import.meta.glob("../contracts/*.json", { eager: true });
   const contracts: any = {};
 
   for (const path in modules) {
