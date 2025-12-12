@@ -1,6 +1,6 @@
 import { Outlet, useLocation } from "react-router-dom";
 import Navbar from "./Navbar";
-import { useState } from "react";
+import { useState, useMemo } from "react"; // Thêm useMemo để tối ưu
 import Message from "./Message";
 import ChatBox from "./ChatBox";
 import Sidebar from "../components/Sidebar";
@@ -8,7 +8,9 @@ import SidebarGroup from "../components/Groups/SidebarGroup";
 import NotificationPanel from "./Notification/Notification";
 import UserMenuDropdown from "./UserMenuDrop";
 import { dummyFollowersData } from "../assets/assets";
-import useWallet from '../wallet/useWallet';
+
+// Import Auth Context mới
+import { useAuth1 } from "../context/Context";
 
 // Import hook useNotifications
 import { useNotifications } from "../hooks/useNotifications";
@@ -16,77 +18,90 @@ import { useNotifications } from "../hooks/useNotifications";
 const Layout = () => {
   const location = useLocation();
   const isGroupRoute = location.pathname.startsWith("/groups");
-  const { 
-        currentAccount, 
-        connectWallet, 
-        isLoading 
-    } = useWallet();
+  
+  // Dùng Auth Context để check trạng thái đăng nhập (nếu cần)
+  const { user } = useAuth1();
 
+  // State quản lý Popup
   const [isChatListOpen, setIsChatListOpen] = useState(false);
-  const [isNotification, setIsNotification] = useState(false);
-  const [isUser, setIsUser] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [popupChatUser, setPopupChatUser] = useState(null);
 
-  // --- GỌI HOOK ---
-  const { notifications, loading, handleAction, markAsRead, markAllAsRead } = useNotifications();
+  // --- GỌI HOOK NOTIFICATION ---
+  const { 
+    notifications, 
+    loading: notifLoading, 
+    handleAction, 
+    markAsRead, 
+    markAllAsRead,
+    refetch // Lấy thêm hàm refetch để gọi khi mở panel
+  } = useNotifications();
 
-  // Đếm số lượng chưa đọc
-  const unreadCount = notifications.filter((n) => n.isUnread).length;
+  // Đếm số lượng chưa đọc (Dùng useMemo để tránh tính lại không cần thiết)
+  const unreadCount = useMemo(() => {
+    return notifications ? notifications.filter((n) => n.isUnread).length : 0;
+  }, [notifications]);
+
+  // --- HANDLERS ---
 
   const handleChatListToggle = () => {
     setIsChatListOpen((prev) => !prev);
-    setIsNotification(false);
-    setisNotification(false);
-    setisUser(false);
+    setIsNotificationOpen(false);
+    setIsUserMenuOpen(false);
   };
   
-  const handleNotification = () => {
-    setIsNotification((prev) => !prev);
+  const handleNotificationToggle = () => {
+    // Nếu đang đóng mà bấm mở -> Gọi refetch để lấy dữ liệu mới nhất
+    if (!isNotificationOpen) {
+        refetch();
+    }
+    setIsNotificationOpen((prev) => !prev);
     setIsChatListOpen(false);
-    setisUser(false);
+    setIsUserMenuOpen(false);
   };
   
-  const handleUser = () => {
-    setIsUser((prev) => !prev);
+  const handleUserMenuToggle = () => {
+    setIsUserMenuOpen((prev) => !prev);
     setIsChatListOpen(false);
-    setisNotification(false);
+    setIsNotificationOpen(false);
   };
   
-  const handleChatSelect = (user: any) => {
-    setPopupChatUser(user);
+  const handleChatSelect = (chatUser) => {
+    setPopupChatUser(chatUser);
     setIsChatListOpen(false);
   };
 
   return (
     <div className="w-full flex-col h-screen">
-      {/* Truyền số lượng xuống Navbar */}
+      {/* NAVBAR */}
       <Navbar
         onMessageClick={handleChatListToggle}
-        onNotification={handleNotification}
-        onUser={handleUser}
+        onNotification={handleNotificationToggle}
+        onUser={handleUserMenuToggle}
         unreadCount={unreadCount} 
       />
 
-      {/* Popup Notification */}
+      {/* POPUP: NOTIFICATION */}
       <div
         className={`fixed right-0 top-12 w-96 h-[500px] 
           bg-white shadow-2xl border border-gray-200 rounded-xl z-50
           origin-top-right transition-all duration-300 ${
-            isNotification
+            isNotificationOpen
               ? "opacity-100 scale-100"
               : "opacity-0 scale-95 pointer-events-none"
           }`}
       >
         <NotificationPanel 
           notifications={notifications}
-          loading={loading}
+          loading={notifLoading}
           onAction={handleAction}
           onRead={markAsRead}
           onMarkAllRead={markAllAsRead}
         />
       </div>
 
-      {/* Các Popup khác giữ nguyên... */}
+      {/* POPUP: CHAT LIST */}
       <div
         className={`fixed right-0 top-12 w-96 h-[500px] 
           bg-white shadow-2xl border border-gray-200 rounded-xl z-50
@@ -99,18 +114,21 @@ const Layout = () => {
         <Message onChatSelect={handleChatSelect} />
       </div>
 
+      {/* POPUP: USER MENU */}
       <div
         className={`fixed right-0 top-12 w-96 h-[500px] 
           bg-white shadow-2xl border border-gray-200 rounded-xl z-50
           origin-top-right transition-all duration-300 ${
-            isUser
+            isUserMenuOpen
               ? "opacity-100 scale-100"
               : "opacity-0 scale-95 pointer-events-none"
           }`}
       >
-        <UserMenuDropdown user={dummyFollowersData} />
+        {/* Truyền user thật từ Context vào Menu, fallback sang dummy nếu chưa login */}
+        <UserMenuDropdown user={user ? { name: user.username || user.address, avatar: user.avatar } : dummyFollowersData} />
       </div>
 
+      {/* CHAT BOX (POPUP DƯỚI GÓC) */}
       {popupChatUser && (
         <ChatBox
           user={popupChatUser}
@@ -118,7 +136,7 @@ const Layout = () => {
         />
       )}
 
-      {/* MAIN LAYOUT */}
+      {/* MAIN CONTENT */}
       <div className="flex">
         {isGroupRoute ? (
           <div className="mt-10">

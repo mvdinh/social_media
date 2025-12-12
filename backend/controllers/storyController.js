@@ -1,104 +1,123 @@
 import fs from "fs";
 import axios from "axios";
-import { uploadFileToIPFS, uploadJSONToIPFS, getIPFSMetadata } from "../services/ipfsService.js";
+import Story from "../models/story.js";
+import { uploadFileToIPFS, uploadJSONToIPFS } from "../services/ipfs.service.js";
 import { IPFS_CONFIG } from "../config/ipfs.js";
 
-// GET / - List Stories
+/**
+ * GET /api/story
+ * Lấy danh sách Story từ DB
+ */
 export const getStories = async (req, res) => {
   try {
-    const response = await axios.post(
-      `${IPFS_CONFIG.API_URL}/pin/ls`,
-      {},
-      { params: { type: 'recursive' } }
-    );
+    // Lấy tất cả story, sắp xếp mới nhất lên đầu
+    const stories = await Story.find().sort({ createdAt: -1 });
+    
+    const formattedStories = stories.map(s => ({
+      _id: s._id,
+      owner: s.owner,
+      type: s.type,
+      content: s.content,
+      backgroundColor: s.backgroundColor,
+      ipfsHash: s.ipfsHash,
+      // URL Proxy để Frontend hiển thị file
+      url: s.mediaUrl ? `http://localhost:3000/api/story/view/${s.ipfsHash}` : null, 
+      createdAt: s.createdAt
+    }));
 
-    const pins = response.data.Keys || {};
-    const files = [];
-
-    // Parallel fetch metadata
-    const promises = Object.keys(pins).map(async (hash) => {
-      const metadata = await getIPFSMetadata(hash);
-      if (metadata && (metadata.type?.startsWith('story-'))) {
-        files.push({
-          ipfsHash: hash,
-          name: metadata.owner || "Unknown",
-          datePinned: new Date().toISOString(),
-          url: `http://localhost:3000/api/story/view/${hash}`,
-          type: metadata.type,
-          backgroundColor: metadata.backgroundColor || null,
-          content: metadata.content || metadata.contentSnippet || null
-        });
-      }
-    });
-
-    await Promise.all(promises);
-    res.json(files);
+    res.json(formattedStories);
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch stories from IPFS" });
-  }
-};
-
-// POST /post - Create Story
-export const createStory = async (req, res) => {
-  try {
-    const { owner, type, content, backgroundColor } = req.body;
-    const timestamp = Date.now();
-    const file = req.file;
-
-    if (!owner || !type) return res.status(400).json({ error: "Missing fields" });
-
-    let ipfsHash;
-
-    if (type === "Photo" || type === "Video") {
-      if (!file) return res.status(400).json({ error: "File required" });
-      
-      const fileHash = await uploadFileToIPFS(file.path);
-      const metadata = {
-        owner, timestamp,
-        type: type === "Video" ? "story-video" : "story-photo",
-        contentHash: fileHash,
-        name: `Story by ${owner}`
-      };
-      
-      ipfsHash = await uploadJSONToIPFS(metadata);
-      fs.unlinkSync(file.path); // Clean up
-    } 
-    else if (type === "Text") {
-      if (!content || !backgroundColor) return res.status(400).json({ error: "Content requried" });
-      
-      const textStory = {
-        owner, timestamp,
-        type: "story-text",
-        backgroundColor, content,
-        contentSnippet: content.substring(0, 50),
-        name: `Text Story by ${owner}`
-      };
-      ipfsHash = await uploadJSONToIPFS(textStory);
-    } else {
-      return res.status(400).json({ error: "Invalid type" });
-    }
-
-    res.json({ 
-      ipfsHash, 
-      owner, timestamp, 
-      url: `http://localhost:3000/api/story/view/${ipfsHash}` 
-    });
-  } catch (err) {
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     res.status(500).json({ error: err.message });
   }
 };
 
-// GET /view/:cid - Proxy Stream
-export const viewStory = async (req, res) => {
+/**
+ * POST /api/story/create
+ * Tạo Story (Upload IPFS + Save DB)
+ */
+export const createStory = async (req, res) => {
+  try {
+    // 1. LẤY OWNER TỪ JWT
+    const owner = req.user?.address; 
+    if (!owner) return res.status(401).json({ error: "Unauthorized" });
+
+    const { type, content, backgroundColor } = req.body;
+    const file = req.file; // File từ Multer
+
+    let ipfsHash;
+    let mediaUrl; // URL gốc của IPFS (Gateway nội bộ)
+
+    // 2. XỬ LÝ THEO TYPE
+    if (type === "Photo" || type === "Video") {
+      if (!file) return res.status(400).json({ error: "File is required" });
+      
+      console.log(`📤 Uploading ${type} to IPFS Desktop...`);
+      ipfsHash = await uploadFileToIPFS(file.path);
+      mediaUrl = `${IPFS_CONFIG.GATEWAY_URL}/${ipfsHash}`;
+      
+      // Dọn dẹp file tạm
+      if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+
+    } else if (type === "Text") {
+      if (!content || !backgroundColor) {
+        return res.status(400).json({ error: "Content & Background required" });
+      }
+      
+      // Với Text, ta upload 1 file JSON chứa nội dung lên IPFS
+      const metadata = { owner, type, content, backgroundColor, timestamp: Date.now() };
+      ipfsHash = await uploadJSONToIPFS(metadata);
+      mediaUrl = null; // Text không có file media
+
+    } else {
+      return res.status(400).json({ error: "Invalid Type" });
+    }
+
+    // 3. LƯU VÀO MONGODB
+    const newStory = await Story.create({
+      owner,
+      type,
+      content: type === "Text" ? content : null,
+      backgroundColor: type === "Text" ? backgroundColor : null,
+      ipfsHash,
+      mediaUrl
+    });
+
+    console.log(`✅ Story Created: ${newStory._id}`);
+
+    res.json({ success: true, story: newStory });
+
+  } catch (err) {
+    // Xóa file tạm nếu lỗi xảy ra
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    console.error("Create Story Error:", err);
+    res.status(500).json({ error: "Create story failed" });
+  }
+};
+
+/**
+ * GET /api/story/view/:cid
+ * Proxy Stream: Đọc từ IPFS Desktop (8080) -> Pipe về Client (3000)
+ */
+export const viewStoryProxy = async (req, res) => {
   try {
     const { cid } = req.params;
     const ipfsUrl = `${IPFS_CONFIG.GATEWAY_URL}/${cid}`;
-    const response = await axios.get(ipfsUrl, { responseType: 'stream' });
 
-    res.setHeader('Content-Type', response.headers['content-type']);
+    // Gọi IPFS lấy luồng dữ liệu
+    const response = await axios.get(ipfsUrl, {
+      responseType: 'stream'
+    });
+
+    // Copy Content-Type (image/jpeg, video/mp4) trả về cho Client
+    if (response.headers['content-type']) {
+        res.setHeader('Content-Type', response.headers['content-type']);
+    }
+    
+    // Bơm dữ liệu
     response.data.pipe(res);
+
   } catch (error) {
-    res.status(404).send("File not found");
+    // console.error(`Proxy Error ${req.params.cid}:`, error.message);
+    res.status(404).send("File not found on IPFS");
   }
 };

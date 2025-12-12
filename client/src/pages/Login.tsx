@@ -1,103 +1,29 @@
-import { useAuth } from "../context/AuthContext";
+import { useAuth1 } from "../context/Context";
 import { Wallet, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
-import { toast, Toaster } from "sonner";
+import { useEffect } from "react";
+import { Toaster } from "sonner";
 
 const Login = () => {
-  const { connectWallet, loading, error } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth1();
   const navigate = useNavigate();
-  const [localError, setLocalError] = useState("");
-  const [registering, setRegistering] = useState(false);
 
-  const handleConnect = async () => {
-    setLocalError("");
+  // Nếu đã login rồi thì đá sang Feed luôn (tránh user F5 lại trang login)
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/feed");
+    }
+  }, [isAuthenticated, navigate]);
 
+  const handleLoginClick = async () => {
     try {
-      // 1. Connect wallet
-      const result = await connectWallet();
-
-      if (!result) {
-        setLocalError("Failed to connect wallet");
-        return;
-      }
-
-      if (!result.address) {
-        setLocalError("Wallet address not found");
-        return;
-      }
-
-      console.log("🔐 Wallet connected:", result.address);
-      console.log("📦 Loaded contracts:", Object.keys(result.contracts));
-
-      // 2. Check và đăng ký user vào Account contract
-      const accountContract = result.contracts["acc"];
-      
-      if (!accountContract) {
-        console.error("❌ Account contract not found");
-        setLocalError("Account contract not loaded");
-        return;
-      }
-
-      setRegistering(true);
-      toast.loading("Đang kiểm tra tài khoản...", { id: "register-toast" });
-
-      try {
-        // Kiểm tra user đã đăng ký chưa
-        const isRegistered = await accountContract.isUserRegistered(result.address);
-        console.log("📋 User registered status:", isRegistered);
-
-        if (!isRegistered) {
-          console.log("🆕 Registering new user...");
-          toast.loading("Đang đăng ký tài khoản...", { id: "register-toast" });
-
-          // Đăng ký user mới
-          const tx = await accountContract.register();
-          console.log("⏳ Transaction sent:", tx.hash);
-          
-          await tx.wait();
-          console.log("✅ User registered successfully!");
-          
-          toast.success("Đăng ký tài khoản thành công!", { id: "register-toast" });
-        } else {
-          console.log("👤 User already registered");
-          toast.success("Đăng nhập thành công!", { id: "register-toast" });
-        }
-
-        // 3. Chờ một chút để transaction được xác nhận
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // 4. Chuyển trang
-        console.log("🚀 Navigating to feed...");
-        navigate("/feed");
-
-      } catch (registerError: any) {
-        console.error("❌ Registration error:", registerError);
-        
-        if (registerError.code === 4001) {
-          toast.error("Bạn đã từ chối giao dịch", { id: "register-toast" });
-          setLocalError("User rejected transaction");
-        } else if (registerError.message?.includes("Da dang ky roi")) {
-          // Nếu đã đăng ký rồi (có thể do race condition)
-          console.log("✅ User already registered (caught in error)");
-          toast.success("Đăng nhập thành công!", { id: "register-toast" });
-          navigate("/feed");
-        } else {
-          toast.error("Không thể đăng ký tài khoản", { id: "register-toast" });
-          setLocalError("Registration failed: " + registerError.message);
-        }
-      } finally {
-        setRegistering(false);
-      }
-
-    } catch (err: any) {
-      console.error("❌ Connection error:", err);
-      setLocalError(err.message || "Connection failed");
-      toast.error("Không thể kết nối ví", { id: "register-toast" });
+      await login(); // Gọi hàm login từ Context
+      // Nếu không có lỗi ném ra, login thành công -> useEffect ở trên sẽ tự chuyển trang
+    } catch (error) {
+      // Lỗi đã được xử lý hiển thị Toast bên trong AuthContext
+      // Ở đây chỉ cần catch để app không crash
     }
   };
-
-  const isLoading = loading || registering;
 
   return (
     <div className="relative min-h-screen flex items-center">
@@ -133,37 +59,29 @@ const Login = () => {
                   <Wallet className="w-8 h-8 text-white" />
                 </div>
                 <h2 className="text-3xl font-bold text-gray-800 mb-2">Sign In</h2>
-                <p className="text-gray-600">Connect your wallet to continue</p>
+                <p className="text-gray-600">Connect wallet & Sign to authenticate</p>
               </div>
 
-              {(error || localError) && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
-                  {error || localError}
-                </div>
-              )}
-
               <button
-                onClick={handleConnect}
+                onClick={handleLoginClick}
                 disabled={isLoading}
                 className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-lg"
               >
                 {isLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    {registering ? "Registering..." : "Connecting..."}
+                    Connecting...
                   </>
                 ) : (
                   <>
                     <Wallet className="w-5 h-5" />
-                    Connect with MetaMask
+                    Connect & Sign In
                   </>
                 )}
               </button>
 
               <p className="text-xs text-gray-500 text-center mt-4">
-                {registering 
-                  ? "Đang đăng ký tài khoản của bạn vào blockchain..."
-                  : "Lần đầu đăng nhập sẽ tự động tạo tài khoản"}
+                Bằng cách kết nối, bạn đồng ý ký một thông điệp để xác minh quyền sở hữu ví.
               </p>
             </div>
           </div>

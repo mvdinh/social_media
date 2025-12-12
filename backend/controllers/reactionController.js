@@ -1,98 +1,84 @@
-import { ethers } from "ethers";
-import Nonce from "../models/nonce.js";
 import Reaction from "../models/reaction.js";
-import { EIP712_DOMAIN, EIP712_TYPES } from "../config/eip712.js";
 
-// POST /nonce
-export const generateNonce = async (req, res) => {
-  try {
-    const { address } = req.body;
-    if (!address || !ethers.isAddress(address)) return res.status(400).json({ error: "Invalid Address" });
-
-    const nonce = ethers.hexlify(ethers.randomBytes(32));
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
-    await Nonce.findOneAndUpdate(
-      { address: address.toLowerCase() },
-      { nonce, expiresAt, used: false },
-      { upsert: true, new: true }
-    );
-
-    res.json({ success: true, nonce });
-  } catch (error) {
-    res.status(500).json({ error: "Nonce generation failed" });
-  }
-};
-
-// POST /react
+/**
+ * POST /api/story/react
+ * Tạo reaction mới (Yêu cầu có Token)
+ */
 export const createReaction = async (req, res) => {
   try {
-    const { storyHash, reactorAddress, reactionType, timestamp, nonce, signature, chainId } = req.body;
-
-    // 1. Basic Validation
-    if (!storyHash || !reactorAddress || !signature) return res.status(400).json({ error: "Missing fields" });
+    // 1. LẤY ĐỊA CHỈ TỪ JWT
+    // Middleware verifyToken đã giải mã token và gán payload vào req.user
+    const reactorAddress = req.user?.address; 
     
-    // 2. Validate Timestamp
-    const now = Math.floor(Date.now() / 1000);
-    if (now - timestamp > 300) return res.status(400).json({ error: "Expired request" });
+    if (!reactorAddress) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Token" });
+    }
 
-    // 3. Verify Nonce
-    const nonceDoc = await Nonce.findOne({ 
-      address: reactorAddress.toLowerCase(), 
-      nonce, 
-      used: false 
+    const { storyHash, reactionType } = req.body;
+
+    // Validate input
+    if (!storyHash || !reactionType) {
+        return res.status(400).json({ error: "Missing storyHash or reactionType" });
+    }
+
+    // 2. CHECK TRÙNG LẶP
+    // Kiểm tra xem user này đã thả biểu cảm NÀY cho story NÀY chưa
+    const existingReaction = await Reaction.findOne({
+      storyHash,
+      reactorAddress,
+      reactionType
     });
-    
-    if (!nonceDoc || nonceDoc.expiresAt < new Date()) {
-      return res.status(400).json({ error: "Invalid/Expired Nonce" });
+
+    if (existingReaction) {
+      // Nếu muốn làm tính năng "Bỏ tim" (Toggle), bạn có thể xóa record này ở đây.
+      // Hiện tại ta trả về lỗi để báo cho Frontend biết.
+      return res.status(400).json({ error: "Bạn đã thả biểu cảm này rồi!" });
     }
 
-    // 4. Verify EIP-712 Signature
-    
-    
-    const domain = { ...EIP712_DOMAIN, chainId: chainId || EIP712_DOMAIN.chainId };
-    const value = { storyHash, reactionType, timestamp, nonce };
-    
-    const recovered = ethers.verifyTypedData(domain, EIP712_TYPES, value, signature);
-    
-    if (recovered.toLowerCase() !== reactorAddress.toLowerCase()) {
-      return res.status(401).json({ error: "Invalid Signature" });
-    }
-
-    // 5. Prevent Duplicates & Save
-    const existing = await Reaction.findOne({ storyHash, reactorAddress: reactorAddress.toLowerCase(), reactionType });
-    if (existing) return res.status(400).json({ error: "Already reacted" });
-
-    await Nonce.updateOne({ _id: nonceDoc._id }, { used: true }); // Invalidate nonce
-
+    // 3. LƯU VÀO DB
     await Reaction.create({
       storyHash,
-      reactorAddress: reactorAddress.toLowerCase(),
+      reactorAddress, // Address lấy từ Token -> An toàn
       reactionType,
-      timestamp: new Date(timestamp * 1000),
-      signature,
-      chainId
+      timestamp: new Date()
     });
 
+    // 4. ĐẾM LẠI SỐ LƯỢNG (Để trả về cho Frontend update UI ngay)
     const count = await Reaction.countDocuments({ storyHash, reactionType });
-    res.json({ success: true, currentCount: count });
+
+    res.json({ 
+        success: true, 
+        message: "Reaction added",
+        currentCount: count,
+        reactionType 
+    });
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Reaction Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
-// GET /reactions/:storyHash
+/**
+ * GET /api/story/reactions/:storyHash
+ * Lấy tổng số lượng các loại reaction của 1 story
+ */
 export const getReactions = async (req, res) => {
   try {
+    const { storyHash } = req.params;
+
+    // Aggregate để gom nhóm theo loại (👍, ❤️, ...)
     const counts = await Reaction.aggregate([
-      { $match: { storyHash: req.params.storyHash } },
+      { $match: { storyHash: storyHash } },
       { $group: { _id: "$reactionType", count: { $sum: 1 } } }
     ]);
     
+    // Chuyển mảng thành object: { "👍": 5, "❤️": 2 }
     const result = counts.reduce((acc, curr) => ({ ...acc, [curr._id]: curr.count }), {});
+    
     res.json(result);
   } catch (err) {
+    console.error("Get Reactions Error:", err);
     res.status(500).json({ error: "Failed to fetch counts" });
   }
 };

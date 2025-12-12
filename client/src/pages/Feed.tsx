@@ -14,10 +14,8 @@ import {
 } from "../assets/assets";
 import CreateStoryModal from "./CreateStory";
 import StoryViewerModal from '../components/StoryViewerModal';
-import useWallet from '../wallet/useWallet';
-
-// URL Backend (Khớp với file routes/storyRoutes.js)
-const API_BASE_URL = "http://localhost:3000/api/story";
+import axiosClient from "../api/axiosClient"; // Import axios client
+import { useAuth1 } from "../context/Context"; // Import Auth Context mới
 
 // -----------------------------------------------------------------
 // 1. Story Card
@@ -25,11 +23,11 @@ const API_BASE_URL = "http://localhost:3000/api/story";
 const StoryCard = ({ user, media_url, isCurrentUser = false , type, backgroundColor, onClick }) => {
   // Fallback nếu không có avatar
   const profilePic = user?.profile_picture || assets.sample_profile;
-  const username = user?.username || user || "User"; // Xử lý nếu user chỉ là address string
+  const username = user?.username || user || "User"; 
 
   let storyBg = "";
   let backgroundClass = "";
-  const isTextStory = type === "story-text";
+  const isTextStory = type === "story-text" || type === "Text";
 
   if (isTextStory) {
     backgroundClass = backgroundColor || "bg-gray-800";
@@ -74,7 +72,7 @@ const StoryCard = ({ user, media_url, isCurrentUser = false , type, backgroundCo
 };
 
 // -----------------------------------------------------------------
-// 2. Post Card
+// 2. Post Card (Giữ nguyên)
 // -----------------------------------------------------------------
 const PostCard = ({ post }) => {
   const { user, content, image_urls, likes_count, createdAt } = post;
@@ -144,7 +142,7 @@ const PostCard = ({ post }) => {
 };
 
 // -----------------------------------------------------------------
-// 3. Right Sidebar
+// 3. Right Sidebar (Giữ nguyên)
 // -----------------------------------------------------------------
 const RightSidebar = () => (
   <div className="sticky top-20 space-y-6">
@@ -175,8 +173,8 @@ const RightSidebar = () => (
 // 4. Feed Page (Main Component)
 // -----------------------------------------------------------------
 const Feed = () => {
-  // Lấy địa chỉ ví từ Context để phục vụ ký Signature
-  const { currentAccount, isLoading } = useWallet();
+  // Dùng context mới để check loading (nếu cần hiển thị loading toàn trang)
+  const { isLoading: authLoading } = useAuth1();
 
   const [stories, setStories] = useState([]);
   const [isLoadingStories, setIsLoadingStories] = useState(true);
@@ -187,13 +185,12 @@ const Feed = () => {
   useEffect(() => {
     const fetchStories = async () => {
       try {
-        // Gọi API Backend MVC (Port 3000)
-        const response = await fetch(API_BASE_URL); 
-        if (!response.ok) {
-          throw new Error("Network response was not ok");
-        }
-        const data = await response.json();
-        setStories(data); 
+        // Dùng axiosClient gọi API lấy danh sách story (tự động xử lý refresh token nếu cần)
+        // Endpoint: /story
+        const response = await axiosClient.get("/story"); 
+        
+        // Data backend trả về là mảng story
+        setStories(response.data); 
       } catch (error) {
         console.error("❌ Không thể lấy stories từ API:", error);
       } finally {
@@ -206,7 +203,9 @@ const Feed = () => {
 
   // --- HANDLERS ---
   const handleViewStory = (storyMetadata) => {
-      const index = stories.findIndex(s => s.ipfsHash === storyMetadata.ipfsHash);
+      // Tìm index của story dựa trên _id hoặc ipfsHash
+      // Nếu backend trả về _id thì dùng _id là tốt nhất
+      const index = stories.findIndex(s => s._id === storyMetadata._id || s.ipfsHash === storyMetadata.ipfsHash);
       if (index !== -1) {
           setViewingStoryIndex(index);
       }
@@ -228,10 +227,6 @@ const Feed = () => {
 
   const currentStory = viewingStoryIndex !== null ? stories[viewingStoryIndex] : null;
 
-  if (isLoading) {
-      return <div className="flex items-center justify-center min-h-screen"><p>Loading Wallet...</p></div>;
-  }
-
   return (
     <div className="bg-gray-50 min-h-screen pt-4">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-6 p-4">
@@ -249,17 +244,21 @@ const Feed = () => {
               />
               
               {/* Danh sách Story từ Backend */}
-              {stories.map((story) => (
-                <StoryCard
-                  key={story.ipfsHash}
-                  // API trả về 'name' (hoặc owner address), ta truyền vào prop user
-                  user={story.name || story.owner} 
-                  media_url={story.url}
-                  type={story.type}
-                  backgroundColor={story.backgroundColor}
-                  onClick={() => handleViewStory(story)}
-                />
-              ))}
+              {isLoadingStories ? (
+                 <div className="flex items-center justify-center w-full h-full min-w-[100px] text-gray-400 text-xs">Loading...</div>
+              ) : (
+                stories.map((story) => (
+                  <StoryCard
+                    key={story.ipfsHash || story._id}
+                    // Backend trả về 'owner' (address), so sánh để biết có phải mình không
+                    user={story.owner}
+                    media_url={story.url}
+                    type={story.type}
+                    backgroundColor={story.backgroundColor}
+                    onClick={() => handleViewStory(story)}
+                  />
+                ))
+              )}
             </div>
           </div> 
 
@@ -291,9 +290,8 @@ const Feed = () => {
               currentIndex={viewingStoryIndex} 
               onNext={handleNextStory} 
               onPrev={handlePrevStory} 
-              isLoading={isLoadingStories}
-              // 🔥 QUAN TRỌNG: Truyền địa chỉ ví để thực hiện ký Signature
-              currentUserAddress={currentAccount}
+              isLoading={false}
+              // Bỏ currentUserAddress vì Modal tự check Token
           />
       )}
 

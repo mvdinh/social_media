@@ -1,28 +1,13 @@
-import fs from "fs";
-import path from "path";
-import { ethers } from "ethers";
-import { fileURLToPath } from "url";
+import mongoose from "mongoose";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const StorySchema = new mongoose.Schema({
+  owner: { type: String, required: true, lowercase: true, index: true }, // Địa chỉ ví
+  type: { type: String, enum: ['Text', 'Photo', 'Video'], required: true },
+  content: { type: String }, // Nội dung text
+  backgroundColor: { type: String }, // Màu nền text
+  ipfsHash: { type: String, required: true }, // Hash của file hoặc JSON metadata trên IPFS
+  mediaUrl: { type: String }, // URL gateway để frontend hiển thị nhanh
+  createdAt: { type: Date, default: Date.now, expires: 86400 } // Tự động xóa sau 24h (TTL Index)
+});
 
-// Load ABI + contract address
-const ABI_PATH = path.join(__dirname, "../../abi.json");
-const ADDRESS_PATH = path.join(__dirname, "../../contractAddress.json");
-
-if (!fs.existsSync(ABI_PATH) || !fs.existsSync(ADDRESS_PATH)) {
-  throw new Error("ABI or contractAddress.json not found. Deploy contract first!");
-}
-
-const abi = JSON.parse(fs.readFileSync(ABI_PATH, "utf-8"));
-const { address } = JSON.parse(fs.readFileSync(ADDRESS_PATH, "utf-8"));
-
-// Provider Hardhat
-const provider = new ethers.JsonRpcProvider("http://127.0.0.1:8545");
-
-// **Dùng signer để gửi transaction**
-// lấy account đầu tiên từ Hardhat node
-const signer = provider.getSigner(0);
-
-// Contract với signer
-export const storyContract = new ethers.Contract(address, abi, signer);
+export default mongoose.model("Story", StorySchema);

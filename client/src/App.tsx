@@ -19,12 +19,11 @@ import GroupFeed from "./components/Groups/GroupFeed";
 import GroupDetail from "./components/Groups/GroupDetail";
 import ListPostPage from "./pages/ListPostPage";
 
-import WalletProvider from "./wallet/WalletProvider";
+
 
 function App() {
   return (
 
- <WalletProvider>
     <Routes>
 
       {/* Redirect mặc định */}
@@ -36,7 +35,8 @@ function App() {
       {/* Layout chính */}
       <Route path="/" element={<Layout />}>
 
-        <Route path="feed" element={<ListPostPage/>} />
+        {/* <Route path="feed" element={<ListPostPage/>} /> */}
+        <Route path="feed" element={<Feed/>} />
         <Route path="groups" element={<Connection />} />  {/* cái này hình như cũ rồi */}
         <Route path="discover" element={<CreateStoryModal onClose={false} />} />
         <Route path="profile" element={<Profile />} />
@@ -55,7 +55,6 @@ function App() {
 
       </Route>
     </Routes>
-    </WalletProvider>
 
   );
 }

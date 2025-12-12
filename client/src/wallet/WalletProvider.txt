@@ -19,7 +19,7 @@ const WalletProvider = ({ children }) => {
 
     // Hàm Khởi tạo Provider/Contract
     const initializeProviderAndContract = (account) => {
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const provider = new ethers.providers.BrowserProvider(window.ethereum);
         const signer = provider.getSigner();
         const contractInstance = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
         

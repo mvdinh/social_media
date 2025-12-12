@@ -1,25 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useAuth } from '../contexts/AuthContext';
-import { ethers } from "ethers";
-
-const API_BASE_URL = "http://localhost:3000/api/story";
-
-// Cấu hình EIP-712 (Phải KHỚP 100% với Backend)
-const EIP712_DOMAIN = {
-    name: "Story DApp",
-    version: "1",
-    chainId: 11155111 // Sepolia (hoặc chainId mạng bạn đang dùng)
-};
-
-const EIP712_TYPES = {
-    Reaction: [
-        { name: "storyHash", type: "string" },
-        { name: "reactionType", type: "string" },
-        { name: "timestamp", type: "uint256" },
-        { name: "nonce", type: "string" }
-    ]
-};
+import axiosClient from "../api/axiosClient"; // Tự động gửi Token
 
 const StoryViewerModal = ({ 
     story, 
@@ -29,125 +10,75 @@ const StoryViewerModal = ({
     onNext, 
     onPrev, 
     isLoading,
-    currentUserAddress // Đảm bảo props này được truyền vào từ parent
+    currentUserAddress // Để hiển thị UI thôi, không dùng để ký nữa
 }) => {
-    // Giả sử useAuth cung cấp provider hoặc signer
-    const { address } = useAuth(); 
-    const effectiveUserAddress = currentUserAddress || address;
-
     const [reactionCounts, setReactionCounts] = useState({});
     const videoRef = useRef(null);
 
     const isFirst = currentIndex === 0;
     const isLast = stories && currentIndex === stories.length - 1;
 
-    // 1. Fetch Reaction Counts
+    // 1. Fetch Reaction Counts (Giữ nguyên)
     useEffect(() => {
         const fetchReactionCounts = async () => {
             if (!story || !story.ipfsHash) return;
-
             try {
-                const response = await fetch(`${API_BASE_URL}/reactions/${story.ipfsHash}`);
-                if (response.ok) {
-                    const counts = await response.json();
-                    setReactionCounts(counts);
-                } else {
-                    setReactionCounts({});
+                const response = await axiosClient.get(`story/reactions/${story.ipfsHash}`);
+                if (response.data) {
+                    setReactionCounts(response.data);
                 }
             } catch (error) {
                 console.error("Error fetching reaction counts:", error);
+                setReactionCounts({});
             }
         };
-
         fetchReactionCounts();
         return () => setReactionCounts({});
     }, [story]);
 
-    // 2. Handle Reaction (Logic EIP-712)
+    // 2. Handle Reaction (Logic Mới: Gọi API trực tiếp)
     const handleReactionClick = async (emoji) => {
-        if (!effectiveUserAddress) return alert("⚠️ Vui lòng kết nối ví!");
-        if (!story || !story.ipfsHash) return alert("⚠️ Không thể xác định Story.");
+        // Kiểm tra đăng nhập bằng cách check token trong localStorage
+        const token = localStorage.getItem("accessToken");
+        if (!token) {
+            alert("⚠️ Vui lòng đăng nhập để thả tim!");
+            return;
+        }
+
+        if (!story || !story.ipfsHash) return;
 
         try {
-            // A. Khởi tạo Provider & Signer
-            if (!window.ethereum) return alert("Cài Metamask đi bạn!");
-            const provider = new ethers.BrowserProvider(window.ethereum);
-            const signer = await provider.getSigner();
-
-            // B. Lấy Nonce từ Backend
-            const nonceRes = await fetch(`${API_BASE_URL}/nonce`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ address: effectiveUserAddress })
-            });
-            const nonceData = await nonceRes.json();
-            if (!nonceData.success) throw new Error("Không thể tạo Nonce");
-            
-            const nonce = nonceData.nonce;
-            const timestamp = Math.floor(Date.now() / 1000); // Unix timestamp (seconds)
-
-            // C. Ký EIP-712
-            // Lưu ý: Ethers v6 dùng signTypedData (không có _), v5 dùng _signTypedData
-            const signature = await signer.signTypedData(
-                EIP712_DOMAIN,
-                EIP712_TYPES,
-                {
-                    storyHash: story.ipfsHash,
-                    reactionType: emoji,
-                    timestamp: timestamp,
-                    nonce: nonce
-                }
-            );
-
-            // D. Gửi lên Backend
-            const reactRes = await fetch(`${API_BASE_URL}/react`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    storyHash: story.ipfsHash,
-                    reactorAddress: effectiveUserAddress,
-                    reactionType: emoji,
-                    timestamp: timestamp,
-                    nonce: nonce,
-                    signature: signature,
-                    chainId: EIP712_DOMAIN.chainId
-                }),
+            // GỌI THẲNG API (Token đã có trong header do axiosClient lo)
+            const response = await axiosClient.post("story/react", {
+                storyHash: story.ipfsHash,
+                reactionType: emoji
             });
 
-            const data = await reactRes.json();
+            const data = response.data;
 
-            if (reactRes.ok && data.success) {
-                // E. Cập nhật UI (Optimistic Update)
+            if (data.success) {
+                // Update UI ngay lập tức
                 setReactionCounts(prev => ({
                     ...prev,
                     [emoji]: data.currentCount
                 }));
-            } else {
-                throw new Error(data.error || "Lỗi server.");
-            }
+            } 
 
         } catch (error) {
             console.error("Lỗi Reaction:", error);
-            // Xử lý lỗi user từ chối ký
-            if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
-                // Không làm gì, user tự hủy
-            } else {
-                alert(`❌ Thất bại: ${error.message}`);
-            }
+            const msg = error.response?.data?.error || "Lỗi kết nối";
+            alert(`❌ ${msg}`);
         }
     };
 
-    // ... (Phần render UI giữ nguyên như cũ, chỉ thay logic handleReactionClick) ...
-    // Các phần Loading, Error, Video logic giữ nguyên
-
     if (isLoading || !story) return <div className="fixed inset-0 z-50 bg-black flex items-center justify-center text-white">Loading...</div>;
 
-    const isTextStory = story.type === 'story-text';    
-    const isVideo = story.type && story.type.includes('video'); 
-    const isImage = story.type && story.type.includes('photo') && !isVideo;
+    const isTextStory = story.type === 'story-text' || story.type === 'Text';    
+    const isVideo = story.type && (story.type === 'Video' || story.type.includes('video')); 
+    const isImage = story.type && (story.type === 'Photo' || story.type.includes('photo'));
     const isMedia = isVideo || isImage;
     const backgroundColorClass = isMedia ? 'bg-black' : story.backgroundColor || 'bg-gray-800';
-    const displayname = story.name || "Unknown";
+    const displayname = story.owner ? `${story.owner.slice(0, 6)}...${story.owner.slice(-4)}` : "Unknown";
 
     return (
         <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={onClose}>
@@ -163,20 +94,20 @@ const StoryViewerModal = ({
                 <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/60 to-transparent z-10 flex justify-between items-start">
                     <div className="text-white">
                         <p className="font-bold text-sm">{displayname}</p>
-                        <p className="text-xs opacity-80">{story.datePinned ? new Date(story.datePinned).toLocaleString() : ''}</p>
+                        <p className="text-xs opacity-80">{story.createdAt ? new Date(story.createdAt).toLocaleString() : ''}</p>
                     </div>
                     <button onClick={onClose} className="text-white hover:opacity-70"><X /></button>
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 flex items-center justify-center bg-black">
+                <div className="flex-1 flex items-center justify-center bg-black w-full h-full overflow-hidden">
                     {isVideo ? (
-                        <video ref={videoRef} src={story.url} controls className="max-h-full w-full object-contain" />
+                        <video ref={videoRef} src={story.url} controls className="max-h-full max-w-full object-contain" />
                     ) : isImage ? (
-                        <img src={story.url} alt="Story" className="max-h-full w-full object-contain" />
+                        <img src={story.url} alt="Story" className="max-h-full max-w-full object-contain" />
                     ) : (
                         <div className={`w-full h-full flex items-center justify-center p-6 text-center ${story.backgroundColor || 'bg-purple-600'}`}>
-                            <p className="text-white text-2xl font-bold">{story.content}</p>
+                            <p className="text-white text-2xl font-bold break-words">{story.content}</p>
                         </div>
                     )}
                 </div>
@@ -188,7 +119,7 @@ const StoryViewerModal = ({
                             <button 
                                 key={emoji} 
                                 onClick={(e) => { e.stopPropagation(); handleReactionClick(emoji); }}
-                                className="text-3xl hover:scale-125 transition-transform relative"
+                                className="text-3xl hover:scale-125 transition-transform relative group"
                             >
                                 {emoji}
                                 {reactionCounts[emoji] > 0 && (

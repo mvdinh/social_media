@@ -8,8 +8,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext"; // import hook context
-import { useEffect } from "react";
+import { useAuth1 } from "../context/Context";
+import { toast } from "sonner"; // Thêm thông báo cho đẹp
 
 const menuItems = [
   { icon: Settings, text: "Cài đặt và quyền riêng tư" },
@@ -21,7 +21,8 @@ const menuItems = [
 
 const UserMenuDropdown = ({ user }: { user: any }) => {
   const navigate = useNavigate();
-  const { logout , address} = useAuth(); // lấy hàm logout từ context
+  // Lấy hàm logout từ Context
+  const { logout } = useAuth1(); 
 
   if (!user) return null;
 
@@ -29,29 +30,40 @@ const UserMenuDropdown = ({ user }: { user: any }) => {
     "flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition duration-150 cursor-pointer";
   const iconClass = "h-5 w-5 text-gray-600 mr-3";
 
-  const handleMenuClick = (item: typeof menuItems[0]) => {
+  // Sửa thành ASYNC để đợi API chạy xong
+  const handleMenuClick = async (item: typeof menuItems[0]) => {
     if (item.action === "logout") {
-      logout();      // gọi context logout
-      navigate("/"); // redirect về trang login/home
-      console.log('user after logout',address )
+      try {
+        // Gọi hàm logout (Logic API nằm bên trong Context)
+        await logout(); 
+        
+        toast.success("Đã đăng xuất");
+        
+        // Chuyển hướng về trang Login
+        navigate("/login"); 
+      } catch (error) {
+        console.error("Lỗi đăng xuất:", error);
+        // Vẫn chuyển trang để người dùng không bị kẹt
+        navigate("/login");
+      }
     } else {
       console.log(`Clicked on: ${item.text}`);
     }
   };
 
   return (
-    <div className="bg-white shadow-2xl rounded-xl border border-gray-200 overflow-hidden">
-      {/* Profile Summary Section */}
+    <div className="bg-white shadow-2xl rounded-xl border border-gray-200 overflow-hidden w-80">
+      {/* Profile Summary */}
       <div className="p-4 border-b border-gray-100">
         <div className="flex items-center space-x-3 cursor-pointer p-2 rounded-lg hover:bg-gray-100 transition duration-150">
           <img
-            src={user.avatar}
+            src={user.avatar || "https://via.placeholder.com/150"}
             alt={user.name}
             className="h-14 w-14 rounded-full object-cover border border-gray-100"
           />
-          <div>
-            <p className="font-semibold text-lg text-gray-900">{user.name}</p>
-            <p className="text-gray-500 text-sm">Xem trang cá nhân của bạn</p>
+          <div className="overflow-hidden">
+            <p className="font-semibold text-lg text-gray-900 truncate">{user.name}</p>
+            <p className="text-gray-500 text-sm truncate">Xem trang cá nhân</p>
           </div>
         </div>
 
@@ -73,10 +85,10 @@ const UserMenuDropdown = ({ user }: { user: any }) => {
           >
             <div
               className={`p-2 rounded-full bg-gray-200 ${
-                item.text === "Đăng xuất" ? "bg-red-100" : ""
+                item.text === "Đăng xuất" ? "bg-red-100 text-red-600" : ""
               }`}
             >
-              <item.icon className={iconClass} />
+              <item.icon className={`${iconClass} ${item.text === "Đăng xuất" ? "text-red-600" : ""}`} />
             </div>
             <div className="flex-grow">
               <p
@@ -92,16 +104,18 @@ const UserMenuDropdown = ({ user }: { user: any }) => {
                 <p className="text-gray-500 text-xs mt-0.5">{item.subtitle}</p>
               )}
             </div>
-            <ChevronRight className="h-5 w-5 text-gray-500 ml-auto" />
+            {item.text !== "Đăng xuất" && (
+                <ChevronRight className="h-5 w-5 text-gray-500 ml-auto" />
+            )}
           </div>
         ))}
       </div>
 
       <div className="p-4 pt-2 text-xs text-gray-500">
         <p className="leading-relaxed">
-          Quyền riêng tư · Điều khoản · Quảng cáo · Lựa chọn quảng cáo{" "}
-          <span className="text-blue-600">▷</span> · Cookie · Xem thêm
+          Quyền riêng tư · Điều khoản · Quảng cáo · Cookie · Xem thêm
         </p>
+        <p className="mt-2">PingUp © 2025</p>
       </div>
     </div>
   );
