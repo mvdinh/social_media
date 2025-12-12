@@ -1,5 +1,6 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import useWallet from '../wallet/useWallet';
 
 /**
  * Component hiển thị Story toàn màn hình (Modal)
@@ -17,13 +18,45 @@ const StoryViewerModal = ({
     currentIndex, 
     onNext, 
     onPrev, 
-    isLoading
+    isLoading,
+    currentUserAddress
 }) => {
+
+    const { getSigner } = useWallet();
+
+    const [reactionCounts, setReactionCounts] = useState({});
 
     const videoRef = useRef(null);
 
     const isFirst = currentIndex === 0;
     const isLast = stories && currentIndex === stories.length - 1;
+
+    useEffect(() => {
+        const fetchReactionCounts = async () => {
+            if (!story || !story.ipfsHash) return;
+
+            try {
+                // Gọi endpoint mới GET /reactions/:storyHash
+                const response = await fetch(`http://localhost:5000/reactions/${story.ipfsHash}`);
+                
+                if (response.ok) {
+                    const counts = await response.json();
+                    setReactionCounts(counts);
+                } else {
+                    console.error("Failed to fetch reaction counts:", response.statusText);
+                    setReactionCounts({});
+                }
+            } catch (error) {
+                console.error("Error fetching reaction counts:", error);
+                setReactionCounts({});
+            }
+        };
+
+        fetchReactionCounts();
+        
+        return () => setReactionCounts({});
+        
+    }, [story]);
     
     // Nếu đang tải hoặc chưa có dữ liệu, hiển thị placeholder
     if (isLoading || !story) {
@@ -80,6 +113,61 @@ const StoryViewerModal = ({
     const displayTime = story.datePinned ? timeAgo(story.datePinned) : "N/A";
 
     const reactions = ['👍', '❤️', '😱', '😂', '😮', '😢', '😡'];
+
+    const handleReactionClick = async (emoji) => {
+        const storyHash = story.ipfsHash; 
+        
+        if (!currentUserAddress) {
+            alert("⚠️ Vui lòng kết nối ví!");
+            return;
+        }
+
+        const signer = getSigner();
+        const message = `Reacting ${emoji} to Story ${storyHash}`;
+        
+        let signature;
+        try {
+            signature = await signer.signMessage(message);
+        } catch (error) {
+            alert("Người dùng đã từ chối giao dịch ký.");
+            return;
+        }
+
+        if (!storyHash) {
+            alert("⚠️ Không thể xác định Story.");
+            return;
+        }
+
+        try {
+            const response = await fetch("http://localhost:5000/react", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    storyHash: storyHash, 
+                    reactorAddress: currentUserAddress,
+                    reactionType: emoji,
+                    signature: signature,
+                    message: message
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                // CẬP NHẬT STATE BỘ ĐẾM CỤC BỘ TỪ MONGODB: { currentCount: N, reactionType: "emoji" }
+                setReactionCounts(prevCounts => ({
+                    ...prevCounts,
+                    [data.reactionType]: data.currentCount // Cập nhật bộ đếm cho loại emoji vừa gửi
+                }));
+                
+            } else {
+                throw new Error(data.error || "Lỗi server.");
+            }
+        } catch (error) {
+            console.error("Lỗi khi gửi:", error);
+            alert(`❌ Gửi thất bại: ${error.message}`);
+        }
+    };
 
     useEffect(() => {
         if (isVideo && videoRef.current && story.url) {
@@ -175,7 +263,7 @@ const StoryViewerModal = ({
 
             {/* Footer (Reactions) */}
             <div className="absolute bottom-0 left-0 right-0 z-50 p-3 flex justify-center w-full">
-                <div className="flex items-center w-full max-w-4xl px-4 md:px-0"> 
+                <div className="flex items-center w-full max-w-md px-4">
                     
                     {/* Ô Gửi Tin Nhắn (Input) */}
                     <input
@@ -190,14 +278,20 @@ const StoryViewerModal = ({
                         {reactions.map((emoji, index) => (
                             <button
                                 key={index}
-                                className={`text-2xl transition-transform transform hover:scale-125 focus:outline-none ${index < 2 ? 'bg-white rounded-full p-1' : ''}`}
+                                className={`text-2xl relative transition-transform transform hover:scale-125 focus:outline-none ${index < 2 ? 'bg-white rounded-full p-1' : ''}`}
                                 onClick={(e) => { 
                                     e.stopPropagation(); 
-                                    console.log(`Reacted with: ${emoji}`);
+                                    handleReactionClick(emoji);
                                 }}
                                 title={`Gửi reaction: ${emoji}`}
                             >
                                 {emoji}
+                                {/* HIỂN THỊ SỐ LƯỢNG */}
+                                {reactionCounts[emoji] > 0 && (
+                                    <span className="absolute top-[-14px] right-[-14px] text-xs font-bold bg-red-600 text-white rounded-full px-1.5 py-0.5 pointer-events-none border-2 border-white z-10">
+                                        {reactionCounts[emoji]}
+                                    </span>
+                                )}
                             </button>
                         ))}
                     </div>

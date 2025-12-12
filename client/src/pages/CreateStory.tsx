@@ -125,11 +125,11 @@
         if (storyType === "Video") {
           // ---  XỬ LÝ UPLOAD video ---
           formData.append("type", "Video");
-          formData.append("storyFile", selectedFile!); // Key này phải khớp với API (upload.single("storyFile"))
+          formData.append("storyFile", selectedFile!); 
         } else if (storyType === "Photo") {
           // ---  XỬ LÝ UPLOAD ẢNH ---
           formData.append("type", "Photo");
-          formData.append("storyFile", selectedFile!); // Key này phải khớp với API (upload.single("storyFile"))
+          formData.append("storyFile", selectedFile!); 
         } else {
           // --- Thêm dữ liệu cho Text story ---
           formData.append("type", "Text");
@@ -229,7 +229,7 @@
                         //controls
                         //autoPlay
                         loop
-                        muted // Mute để tự động phát
+                        //muted // Mute để tự động phát
                         className="h-full w-full object-contain rounded-lg"
                      />
                   ) : isImage ? (

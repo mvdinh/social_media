@@ -16,6 +16,8 @@
 
   import StoryViewerModal from '../components/StoryViewerModal';
 
+  import useWallet from '../wallet/useWallet';
+
   // -----------------------------------------------------------------
   // 1. Story Card
   // -----------------------------------------------------------------
@@ -198,6 +200,9 @@
   // 4. Feed Page
   // -----------------------------------------------------------------
   const Feed = () => {
+
+    const { currentAccount, isLoading } = useWallet();
+
     // 1. Tạo state để lưu trữ stories
     const [stories, setStories] = useState([]);
     const [isLoadingStories, setIsLoadingStories] = useState(true);
@@ -262,6 +267,14 @@
     // 💡 Lấy Story hiện tại từ Index
     const currentStory = viewingStoryIndex !== null ? stories[viewingStoryIndex] : null;
 
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <p>Đang kiểm tra kết nối ví...</p>
+            </div>
+        );
+    }
+
     return (
       <div className="bg-gray-50 min-h-screen ">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-6 p-4">
@@ -314,6 +327,8 @@
                 currentIndex={viewingStoryIndex} 
                 onNext={handleNextStory} 
                 onPrev={handlePrevStory} 
+                isLoading={isLoadingStories}
+                currentUserAddress={currentAccount}
             />
         )}
 

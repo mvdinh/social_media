@@ -13,7 +13,9 @@ const WalletProvider = ({ children }) => {
     // Trạng thái (State) cần quản lý
     const [currentAccount, setCurrentAccount] = useState(null);
     const [storyManagerContract, setStoryManagerContract] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const [ethersProvider, setEthersProvider] = useState(null);
 
     // Hàm Khởi tạo Provider/Contract
     const initializeProviderAndContract = (account) => {
@@ -23,6 +25,14 @@ const WalletProvider = ({ children }) => {
         
         setCurrentAccount(account);
         setStoryManagerContract(contractInstance);
+        setEthersProvider(provider);
+    };
+
+    const getSigner = () => {
+        if (ethersProvider && currentAccount) {
+            return ethersProvider.getSigner();
+        }
+        return null;
     };
 
     // Hàm Kết Nối Ví MetaMask
@@ -53,6 +63,7 @@ const WalletProvider = ({ children }) => {
     // Lắng nghe sự kiện thay đổi (Account hoặc Chain)
     useEffect(() => {
         if (typeof window.ethereum === 'undefined') {
+            setIsLoading(false);
             return;
         }
 
@@ -67,6 +78,8 @@ const WalletProvider = ({ children }) => {
                 }
             } catch (error) {
                 console.error("Lỗi khi kiểm tra ví đã kết nối:", error);
+            } finally {
+                setIsLoading(false); 
             }
         };
 
@@ -147,6 +160,7 @@ const WalletProvider = ({ children }) => {
         storyManagerContract, // Cung cấp instance contract
         isLoading,
         connectWallet,
+        getSigner,
         postStory,
         getStory,
     };

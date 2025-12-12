@@ -3,8 +3,8 @@ import path from "path";
 import FormData from "form-data";
 import axios from "axios";
 
-const PINATA_API_KEY = "ee0ab07677049d11295a";
-const PINATA_SECRET = "f09107872299d248f3167f7a4d8d42a714649516b1715cc26315cbbe8dbdca7d";
+const PINATA_API_KEY = "ef6b1f8bcd4b17359978";
+const PINATA_SECRET = "74b088b402921ea8e23a904d0f121b2d0d6f9181cf4dad4091565dc880e4d8c8";
 
 export async function uploadToIPFS(filePath,metadata) {
   const data = new FormData();
