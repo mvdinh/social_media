@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { GroupHeader } from './group/GroupHeader';
+import { GroupHeader } from './group/HeaderGroup/GroupHeader';
 import { GroupTabs } from './group/GroupTabs';
 import { CreateGroupPostBox, CreatePostBox } from './group/CreateGroupPostBox';
 import { PostList } from './group/PostList';

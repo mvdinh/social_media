@@ -4,46 +4,79 @@ import { useState } from "react";
 import Message from "./Message";
 import ChatBox from "./ChatBox";
 import Sidebar from "../components/Sidebar";
-import SidebarGroup from "../components/Groups/SidebarGroup"; // <-- sidebar mới
-import NotificationPanel from "./Notification";
+import SidebarGroup from "../components/Groups/SidebarGroup";
+import NotificationPanel from "./Notification/Notification";
 import UserMenuDropdown from "./UserMenuDrop";
 import { dummyFollowersData } from "../assets/assets";
 
+// Import hook useNotifications
+import { useNotifications } from "../hooks/useNotifications";
+
 const Layout = () => {
-  const location = useLocation(); // <-- Lấy URL hiện tại
-  const isGroupRoute = location.pathname.startsWith("/groups"); // <-- kiểm tra
-  
+  const location = useLocation();
+  const isGroupRoute = location.pathname.startsWith("/groups");
+
   const [isChatListOpen, setIsChatListOpen] = useState(false);
-  const [isNotification, setisNotification] = useState(false);
-  const [isUser, setisUser] = useState(false);
+  const [isNotification, setIsNotification] = useState(false);
+  const [isUser, setIsUser] = useState(false);
   const [popupChatUser, setPopupChatUser] = useState(null);
+
+  // --- GỌI HOOK ---
+  const { notifications, loading, handleAction, markAsRead, markAllAsRead } = useNotifications();
+
+  // Đếm số lượng chưa đọc
+  const unreadCount = notifications.filter((n) => n.isUnread).length;
 
   const handleChatListToggle = () => {
     setIsChatListOpen((prev) => !prev);
-    setisNotification(false);
+    setIsNotification(false);
   };
+  
   const handleNotification = () => {
-    setisNotification((prev) => !prev);
+    setIsNotification((prev) => !prev);
     setIsChatListOpen(false);
   };
+  
   const handleUser = () => {
-    setisUser((prev) => !prev);
+    setIsUser((prev) => !prev);
     setIsChatListOpen(false);
   };
-  const handleChatSelect = (user) => {
+  
+  const handleChatSelect = (user: any) => {
     setPopupChatUser(user);
     setIsChatListOpen(false);
   };
 
   return (
     <div className="w-full flex-col h-screen">
+      {/* Truyền số lượng xuống Navbar */}
       <Navbar
         onMessageClick={handleChatListToggle}
         onNotification={handleNotification}
         onUser={handleUser}
+        unreadCount={unreadCount} 
       />
 
-      {/* Popup UI */}
+      {/* Popup Notification */}
+      <div
+        className={`fixed right-0 top-12 w-96 h-[500px] 
+          bg-white shadow-2xl border border-gray-200 rounded-xl z-50
+          origin-top-right transition-all duration-300 ${
+            isNotification
+              ? "opacity-100 scale-100"
+              : "opacity-0 scale-95 pointer-events-none"
+          }`}
+      >
+        <NotificationPanel 
+          notifications={notifications}
+          loading={loading}
+          onAction={handleAction}
+          onRead={markAsRead}
+          onMarkAllRead={markAllAsRead}
+        />
+      </div>
+
+      {/* Các Popup khác giữ nguyên... */}
       <div
         className={`fixed right-0 top-12 w-96 h-[500px] 
           bg-white shadow-2xl border border-gray-200 rounded-xl z-50
@@ -54,18 +87,6 @@ const Layout = () => {
           }`}
       >
         <Message onChatSelect={handleChatSelect} />
-      </div>
-
-      <div
-        className={`fixed right-0 top-12 w-96 h-[500px] 
-          bg-white shadow-2xl border border-gray-200 rounded-xl z-50
-          origin-top-right transition-all duration-300 ${
-            isNotification
-              ? "opacity-100 scale-100"
-              : "opacity-0 scale-95 pointer-events-none"
-          }`}
-      >
-        <NotificationPanel onNotification={handleNotification} />
       </div>
 
       <div
@@ -89,8 +110,7 @@ const Layout = () => {
 
       {/* MAIN LAYOUT */}
       <div className="flex">
-        
-       {isGroupRoute ? (
+        {isGroupRoute ? (
           <div className="mt-10">
             <SidebarGroup />
           </div>
