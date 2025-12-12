@@ -1,6 +1,5 @@
 import { Route, Routes, Navigate } from "react-router-dom";
 import Connection from "./pages/Connections";
-import Discover from "./pages/Discover";
 import Profile from "./pages/Profile";
 import Login from "./pages/Login";
 import Feed from "./pages/Feed";
@@ -20,8 +19,12 @@ import GroupFeed from "./components/Groups/GroupFeed";
 import GroupDetail from "./components/Groups/GroupDetail";
 import ListPostPage from "./pages/ListPostPage";
 
+import WalletProvider from "./wallet/WalletProvider";
+
 function App() {
   return (
+
+ <WalletProvider>
     <Routes>
 
       {/* Redirect mặc định */}
@@ -52,6 +55,8 @@ function App() {
 
       </Route>
     </Routes>
+    </WalletProvider>
+
   );
 }
 

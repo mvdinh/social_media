@@ -8,6 +8,7 @@ import SidebarGroup from "../components/Groups/SidebarGroup";
 import NotificationPanel from "./Notification/Notification";
 import UserMenuDropdown from "./UserMenuDrop";
 import { dummyFollowersData } from "../assets/assets";
+import useWallet from '../wallet/useWallet';
 
 // Import hook useNotifications
 import { useNotifications } from "../hooks/useNotifications";
@@ -15,6 +16,11 @@ import { useNotifications } from "../hooks/useNotifications";
 const Layout = () => {
   const location = useLocation();
   const isGroupRoute = location.pathname.startsWith("/groups");
+  const { 
+        currentAccount, 
+        connectWallet, 
+        isLoading 
+    } = useWallet();
 
   const [isChatListOpen, setIsChatListOpen] = useState(false);
   const [isNotification, setIsNotification] = useState(false);
@@ -30,16 +36,20 @@ const Layout = () => {
   const handleChatListToggle = () => {
     setIsChatListOpen((prev) => !prev);
     setIsNotification(false);
+    setisNotification(false);
+    setisUser(false);
   };
   
   const handleNotification = () => {
     setIsNotification((prev) => !prev);
     setIsChatListOpen(false);
+    setisUser(false);
   };
   
   const handleUser = () => {
     setIsUser((prev) => !prev);
     setIsChatListOpen(false);
+    setisNotification(false);
   };
   
   const handleChatSelect = (user: any) => {
