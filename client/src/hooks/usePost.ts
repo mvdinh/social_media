@@ -1,283 +1,219 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { getFromIpfs, uploadTextToIpfs } from '../services/ipfs.service';
-import { Post, Comment } from '../types/post';
+import axiosClient from '../api/axiosClient';
+import { useSocket } from '../context/SocketContext';
 import { getTimeAgo } from '../utils/getTimeAgo';
-import { convertProxyToArray } from '../utils/convertData';
-import { refreshCurrentPostComments } from '../helper/PostHelper';
+import { Post, Comment, MediaType } from '../types/post'; 
 
-const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
-
-interface UsePostsOptions {
-  contract: any;
-  address: string | undefined;
-  groupId?: number; // Nếu có groupId thì load posts của group, không thì load tất cả
-}
-
-export const usePosts = ({ contract, address, groupId }: UsePostsOptions) => {
+export const usePosts = (groupId?: number) => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // State quản lý Modal Comment
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [commentText, setCommentText] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
- 
-  // Load posts (all or group-specific)
-  const loadPosts = async () => {
-    if (!contract) {
-      console.log("Contract not available");
-      return;
-    }
+  const { socket } = useSocket();
 
+  // --------------------------------------------------------
+  // HELPER: MAP DATA TỪ API (MongoDB) SANG FRONTEND (UI)
+  // --------------------------------------------------------
+  const mapPostData = (p: any): Post => {
+    // Convert Backend String Type ('IMAGE', 'VIDEO') -> Frontend Enum Number (0, 1, 2...)
+    let mType = MediaType.TEXT;
+    if (p.mediaType === 'VIDEO') mType = MediaType.VIDEO;
+    else if (p.mediaType === 'IMAGE') mType = MediaType.IMAGE;
+    else if (p.mediaType === 'MIXED') mType = MediaType.MIXED;
+
+    return {
+      id: p._id,
+      // Xử lý author: Nếu backend populate thì lấy object, ko thì lấy string
+      author: p.owner?.address || p.owner, 
+      authorName: p.owner?.username || "Người dùng",
+      avatar: p.owner?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.owner?._id || 'default'}`,
+      
+      content: p.content,
+      // Map mediaUrls từ DB vào mediaHashes của UI cũ để không vỡ layout
+      mediaHashes: p.mediaUrls || [], 
+      image: p.mediaUrls?.[0] || null, // Ảnh cover (ảnh đầu tiên)
+      mediaType: mType,
+      
+      likes: p.likesCount || 0,
+      isLiked: p.isLikedByCurrentUser || false,
+      commentsCount: p.commentsCount || 0,
+      
+      timestamp: new Date(p.createdAt).getTime(),
+      time: getTimeAgo(new Date(p.createdAt).getTime()),
+      isDeleted: p.isDeleted,
+      comments: [] // Comment sẽ load lazy sau
+    };
+  };
+
+  // --------------------------------------------------------
+  // 1. FETCH POSTS (API)
+  // --------------------------------------------------------
+  const loadPosts = useCallback(async () => {
     try {
       setLoading(true);
-      let rawPosts: any[] = [];
+      // Endpoint chuẩn: /posts (hoặc /groups/:id/posts)
+      const endpoint = groupId ? `/groups/${groupId}/posts` : '/posts';
+      
+      const response = await axiosClient.get(endpoint);
+      
+      // Map dữ liệu
+      const formattedPosts = response.data.map(mapPostData);
+      setPosts(formattedPosts);
 
-      // Nếu có groupId thì lấy posts của group, không thì lấy tất cả
-      if (groupId !== undefined) {
-        console.log("Loading posts for group:", groupId);
-        const groupPosts = await contract.getGroupPosts(groupId);
-        rawPosts = convertProxyToArray(groupPosts);
-      } else {
-        console.log("Loading all posts");
-        const postCount = await contract.postCount();
-        console.log("Total posts:", postCount.toString());
-
-        if (postCount.toString() === "0") {
-          setPosts([]);
-          setLoading(false);
-          return;
-        }
-
-        // Load từng post
-        for (let i = Number(postCount); i >= 1; i--) {
-          try {
-            const postData = await contract.getPost(i);
-            rawPosts.push(postData);
-          } catch (error) {
-            console.error(`Error loading post ${i}:`, error);
-          }
-        }
-      }
-
-      const loadedPosts: Post[] = [];
-
-      // Parse từng post
-      for (const postData of rawPosts) {
-        try {
-          const post = {
-            id: postData.id || postData[0],
-            author: postData.author || postData[1],
-            contentHash: postData.contentHash || postData[2],
-            mediaHashes: postData.mediaHashes || postData[3] || [],
-            mediaType: postData.mediaType !== undefined ? postData.mediaType : postData[4],
-            timestamp: postData.timestamp || postData[5],
-            likes: postData.likes || postData[6],
-            isDeleted: postData.isDeleted !== undefined ? postData.isDeleted : postData[7]
-          };
-          
-          if (post.isDeleted || !post.contentHash) {
-            continue;
-          }
-
-          // Giải mã nội dung từ IPFS
-          const content = await getFromIpfs(post.contentHash);
-
-          // Convert mediaHashes
-          const mediaHashesArray = convertProxyToArray(post.mediaHashes);
-
-          let mediaUrl = undefined;
-          if (mediaHashesArray && mediaHashesArray.length > 0) {
-            mediaUrl = `${IPFS_GATEWAY}${mediaHashesArray[0]}`;
-          }
-
-          const isLiked = address ? await contract.checkIfLiked(Number(post.id), address) : false;
-          const comments = await (contract,Number(post.id));
-          const timestamp = Number(post.timestamp);
-          const timeAgo = getTimeAgo(timestamp);
-
-          loadedPosts.push({
-            id: Number(post.id),
-            author: post.author,
-            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author}`,
-            time: timeAgo,
-            content,
-            contentHash: post.contentHash,
-            mediaHashes: mediaHashesArray,
-            mediaType: Number(post.mediaType),
-            image: mediaUrl,
-            likes: Number(post.likes),
-            comments: comments,
-            isLiked,
-            timestamp,
-            isDeleted: post.isDeleted
-          });
-        } catch (error) {
-          console.error("Error parsing post:", error);
-        }
-      }
-
-      setPosts(loadedPosts);
-      console.log("All loaded posts:", loadedPosts);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error loading posts:", error);
-      toast.error("Không thể tải bài viết");
+      toast.error("Không thể tải bảng tin");
     } finally {
       setLoading(false);
     }
-  };
+  }, [groupId]);
 
-  // Handle like
-  const handleLike = async (postId: number) => {
-    if (!contract || !address) {
-      toast.error('Vui lòng kết nối ví!');
-      return;
-    }
+  // --------------------------------------------------------
+  // 2. SOCKET REALTIME LISTENERS
+  // --------------------------------------------------------
+  useEffect(() => {
+    if (!socket) return;
 
-    try {
-      const post = posts.find(p => p.id === postId);
-      if (!post) return;
+    // A. Sự kiện: Có bài viết mới
+    socket.on("new_post", (newPostData: any) => {
+      // Chỉ xử lý nếu đang ở Feed chung hoặc đúng Group
+      // (Nếu muốn filter kỹ hơn cần check groupId trong newPostData)
+      const newPostFormatted = mapPostData(newPostData);
+      newPostFormatted.time = "Vừa xong"; // Realtime nên set time luôn
       
-      if (post.isLiked) {
-        const tx = await contract.unlikePost(postId);
-        toast.loading('Đang bỏ thích...', { id: 'like-toast' });
-        await tx.wait();
-        toast.success('Đã bỏ thích!', { id: 'like-toast' });
-        
-        setPosts(prev => prev.map(p => p.id === postId ? {...p, isLiked: false, likes: p.likes - 1} : p));
-        if (selectedPost && selectedPost.id === postId) {
-          setSelectedPost(prev => prev ? {...prev, isLiked: false, likes: prev.likes - 1} : null);
-        }
-      } else {
-        const tx = await contract.likePost(postId);
-        toast.loading('Đang thích...', { id: 'like-toast' });
-        await tx.wait();
-        toast.success('Đã thích bài viết!', { id: 'like-toast' });
+      // Thêm bài mới vào đầu danh sách
+      setPosts(prev => [newPostFormatted, ...prev]);
+    });
 
-        setPosts(prev => prev.map(p => p.id === postId ? {...p, isLiked: true, likes: p.likes + 1} : p));
-        if (selectedPost && selectedPost.id === postId) {
-          setSelectedPost(prev => prev ? {...prev, isLiked: true, likes: prev.likes + 1} : null);
-        }
+    // B. Sự kiện: Cập nhật lượt Like
+    socket.on("update_post_reaction", ({ postId, likesCount }: any) => {
+      setPosts(prev => prev.map(p => 
+        p.id === postId ? { ...p, likes: likesCount } : p
+      ));
+    });
+
+    // C. Sự kiện: Cập nhật số lượng Comment (ở ngoài Feed)
+    socket.on("update_post_comment_count", ({ postId, count }: any) => {
+      setPosts(prev => prev.map(p => 
+        p.id === postId ? { ...p, commentsCount: count } : p
+      ));
+    });
+
+    // D. Sự kiện: Có Comment mới (chỉ xử lý khi đang mở Modal của bài đó)
+    socket.on("new_comment", ({ postId, comment }: any) => {
+      if (selectedPost && selectedPost.id === postId) {
+        const newCmt: Comment = {
+           id: comment._id,
+           author: comment.owner.address || comment.owner,
+           authorName: comment.owner.username || "User",
+           avatar: comment.owner.avatar,
+           content: comment.content,
+           timestamp: Date.now(),
+           time: "Vừa xong"
+        };
+        // Thêm comment vào list hiện tại trong Modal
+        setSelectedPost(prev => prev ? { ...prev, comments: [...prev.comments, newCmt] } : null);
       }
-    } catch (error: any) {
-      console.error("Error liking post:", error);
-      if (error.code === 4001) {
-        toast.error('Bạn đã từ chối giao dịch', { id: 'like-toast' });
-      } else {
-        toast.error('Lỗi khi thực hiện thao tác', { id: 'like-toast' });
+    });
+
+    // Cleanup listeners
+    return () => {
+      socket.off("new_post");
+      socket.off("update_post_reaction");
+      socket.off("update_post_comment_count");
+      socket.off("new_comment");
+    };
+  }, [socket, selectedPost]);
+
+  // --------------------------------------------------------
+  // 3. USER ACTIONS
+  // --------------------------------------------------------
+
+  // --- LIKE POST ---
+  const handleLike = async (postId: string) => {
+    // 1. Optimistic Update (Cập nhật UI trước khi gọi API)
+    setPosts(prev => prev.map(p => {
+      if (p.id === postId) {
+        return {
+          ...p,
+          isLiked: !p.isLiked,
+          likes: p.isLiked ? p.likes - 1 : p.likes + 1
+        };
       }
+      return p;
+    }));
+
+    // 2. Gọi API
+    try {
+      await axiosClient.post(`/posts/${postId}/like`);
+      // Socket sẽ lo việc đồng bộ cho người khác
+    } catch (error) {
+      console.error("Like error:", error);
+      toast.error("Lỗi thao tác");
+      loadPosts(); // Rollback lại dữ liệu cũ nếu lỗi
     }
   };
 
-  // Handle open comments
+  // --- OPEN COMMENTS (Load chi tiết comment) ---
   const handleOpenComments = async (post: Post) => {
-    const refreshedComments = await refreshCurrentPostComments(contract,post.id);
-    setSelectedPost({
-      ...post,
-      comments: refreshedComments
-    });
-    
+    setSelectedPost({ ...post, comments: [] }); // Mở modal ngay
+    try {
+      const res = await axiosClient.get(`/posts/${post.id}/comments`);
+      
+      const comments = res.data.map((c: any) => ({
+        id: c._id,
+        author: c.owner.address,
+        authorName: c.owner.username || "User",
+        avatar: c.owner.avatar,
+        content: c.content,
+        timestamp: new Date(c.createdAt).getTime(),
+        time: getTimeAgo(new Date(c.createdAt).getTime())
+      }));
+      
+      setSelectedPost(prev => prev ? { ...prev, comments } : null);
+    } catch (error) {
+      console.error("Load comments error", error);
+      toast.error("Không tải được bình luận");
+    }
   };
 
-  // Handle close comments
+  // --- CLOSE COMMENTS ---
   const handleCloseComments = () => {
     setSelectedPost(null);
     setCommentText('');
   };
 
-  // Handle add comment
+  // --- ADD COMMENT ---
   const handleAddComment = async () => {
-    if (!commentText.trim() || !selectedPost || !contract || !address) {
-      toast.error('Vui lòng nhập nội dung bình luận!');
-      return;
-    }
-
+    if (!commentText.trim() || !selectedPost) return;
+    
+    setIsSubmittingComment(true);
     try {
-      toast.loading('Đang thêm bình luận...', { id: 'comment-toast' });
-
-      const commentHash = await uploadTextToIpfs(commentText);
-      const tx = await contract.addComment(selectedPost.id, commentHash);
-      await tx.wait();
-
-      toast.success('Đã thêm bình luận!', { id: 'comment-toast' });
-      setCommentText('');
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const newComments = await refreshCurrentPostComments(contract, selectedPost.id);
-
-      if (newComments) {
-        setSelectedPost(prev => prev ? {
-          ...prev,
-          comments: newComments
-        } : null);
-
-        setPosts(prevPosts => 
-          prevPosts.map(p => 
-            p.id === selectedPost.id 
-              ? { ...p, comments: newComments } 
-              : p
-          )
-        );
-      }
-    } catch (error: any) {
-      console.error("Error adding comment:", error);
+      await axiosClient.post(`/posts/${selectedPost.id}/comment`, {
+        content: commentText
+      });
       
-      if (error.code === 4001) {
-        toast.error('Bạn đã từ chối giao dịch', { id: 'comment-toast' });
-      } else {
-        toast.error('Không thể thêm bình luận', { id: 'comment-toast' });
-      }
+      setCommentText('');
+      toast.success("Đã bình luận");
+      // Socket sẽ lo việc push comment mới vào list
+      
+    } catch (error) {
+      console.error("Add comment error:", error);
+      toast.error("Lỗi gửi bình luận");
+    } finally {
+      setIsSubmittingComment(false);
     }
   };
 
-  // Load posts on mount or when dependencies change
+  // Load posts khi component mount
   useEffect(() => {
-    if (contract) {
-      loadPosts();
-    }
-  }, [contract, address, groupId]);
-
-  // Listen for new comments
-  useEffect(() => {
-    if (!contract || !selectedPost) return;
-
-    const filter = contract.filters.CommentAdded(selectedPost.id);
-    const handleNewComment = () => {
-      console.log("New comment detected, refreshing comments...");
-      refreshCurrentPostComments(contract,selectedPost.id).then(newComments => {
-        setSelectedPost(prev => prev ? { ...prev, comments: newComments } : null);
-        setPosts(prevPosts => 
-          prevPosts.map(p => 
-            p.id === selectedPost.id ? { ...p, comments: newComments } : p
-          )
-        );
-      });
-    };
-
-    contract.on(filter, handleNewComment);
-    return () => {
-      contract.off(filter, handleNewComment);
-    };
-  }, [contract, selectedPost]);
-
-  // Listen for new posts
-  useEffect(() => {
-    if (!contract) return;
-    
-    const filter = groupId !== undefined 
-      ? contract.filters.GroupPostCreated(null, groupId)
-      : contract.filters.PostCreated();
-      
-    const handleNewPost = () => {
-      console.log("New post detected, reloading...");
-      loadPosts();
-    };
-    
-    contract.on(filter, handleNewPost);
-    return () => {
-      contract.off(filter, handleNewPost);
-    };
-  }, [contract, groupId]);
+    loadPosts();
+  }, [loadPosts]);
 
   return {
     posts,
@@ -285,10 +221,12 @@ export const usePosts = ({ contract, address, groupId }: UsePostsOptions) => {
     selectedPost,
     commentText,
     setCommentText,
+    isSubmittingComment,
+    
+    loadPosts,
     handleLike,
     handleOpenComments,
     handleCloseComments,
-    handleAddComment,
-    loadPosts
+    handleAddComment
   };
 };

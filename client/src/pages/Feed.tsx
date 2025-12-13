@@ -16,6 +16,7 @@ import CreateStoryModal from "./CreateStory";
 import StoryViewerModal from '../components/StoryViewerModal';
 import axiosClient from "../api/axiosClient"; // Import axios client
 import { useAuth1 } from "../context/Context"; // Import Auth Context mới
+import ListPostPage from "./ListPostPage";
 
 // -----------------------------------------------------------------
 // 1. Story Card
@@ -263,11 +264,7 @@ const Feed = () => {
           </div> 
 
           {/* POSTS SECTION */}
-          <div className="space-y-6">
-            {dummyPostsData.map((post) => (
-              <PostCard key={post._id} post={post} />
-            ))}
-          </div>
+          <ListPostPage />
         </div>
 
         {/* RIGHT SIDEBAR */}

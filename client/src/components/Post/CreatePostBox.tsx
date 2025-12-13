@@ -1,17 +1,17 @@
 import { FileText, BarChart3, Smile } from 'lucide-react';
 import { CreatePostModal } from './CreatePostModal';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth1 } from '../../context/Context';
 import { useCreatePost } from '../../hooks/useCreatePost';
 
 export function CreatePostBox() {
-  const { address, contracts } = useAuth();
-  const postContract = contracts?.["socialMedia"];
+  const { user } = useAuth1();
+  console.log("CreatePostBox - user:", user);
   
+  // Thông tin user hiển thị
   const currentUser = {
-    name: address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'User',
-    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${address}`,
+    name: user?.username || "Người dùng",
+    avatar: user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.address || 'guest'}`,
   };
-
   const {
     showModal,
     openModal,
@@ -28,9 +28,6 @@ export function CreatePostBox() {
     canPost,
     fileInputRef
   } = useCreatePost({
-    contract: postContract,
-    address: address,
-    // Không truyền groupId => Tạo post bình thường
     onSuccess: () => {
       console.log('Post created successfully!');
     }

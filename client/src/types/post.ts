@@ -1,26 +1,38 @@
+// Định nghĩa Enum khớp với logic hiển thị của Frontend
+export enum MediaType {
+  TEXT = 0,
+  IMAGE = 1,
+  VIDEO = 2,
+  MIXED = 3
+}
+
 export interface Comment {
-  author: string;
+  id: string;
+  author: string; // Address
+  authorName: string;
   avatar: string;
   content: string;
-  contentHash: string;
-  mediaHash: string;
   timestamp: number;
-  isDeleted: boolean;
+  time: string;
 }
 
 export interface Post {
-  id: number;
-  author: string;
-  avatar: string;
-  time: string;
+  id: string;
+  author: string;     // Address
+  authorName: string; // Username hiển thị
+  avatar: string;     // URL Avatar
+  
   content: string;
-  contentHash: string;
-  mediaHashes: string[];
-  mediaType: number;
-  image?: string;
-  likes: number;
+  mediaHashes: string[]; // Frontend cũ dùng tên này, ta giữ nguyên nhưng map data là URL
+  image: string | null;  // URL ảnh đầu tiên để hiển thị cover
+  mediaType: MediaType;  // Enum number (0, 1, 2, 3)
+  
+  likes: number;      // Số lượng like
+  isLiked: boolean;   // Trạng thái like của user hiện tại
+  commentsCount: number;
   comments: Comment[];
-  isLiked: boolean;
+  
   timestamp: number;
+  time: string;
   isDeleted: boolean;
 }

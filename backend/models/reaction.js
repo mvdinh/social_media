@@ -15,7 +15,7 @@ const ReactionSchema = new mongoose.Schema(
     reactionType: {
       type: String,
       required: true,
-    },
+    }, 
 
     timestamp: { type: Date, default: Date.now },
   },

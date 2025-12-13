@@ -1,5 +1,5 @@
 import express from "express";
-import { verifyToken } from "../middleware/authMiddleware.js"; // Middleware xác thực
+import { verifyToken } from "../middleware/auth.js"; // Middleware xác thực
 import { uploadMiddleware } from "../middleware/upload.js"; // Middleware upload file
 import { 
   getStories, 

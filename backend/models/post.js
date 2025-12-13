@@ -1,58 +1,43 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-const postSchema = new mongoose.Schema({
-  author: {
-    type: String,
+const PostSchema = new mongoose.Schema({
+  // LIÊN KẾT VỚI MODEL USER
+  // Thay vì lưu string address, ta lưu _id của User để dùng .populate()
+  owner: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: "User", 
     required: true,
-    lowercase: true,
     index: true
   },
-  contentHash: {
-    type: String,
-    required: true
+
+  content: { 
+    type: String, 
+    default: "" 
   },
-  mediaHashes: [{
-    type: String
+
+  // URLs ảnh/video (Lưu đường dẫn file trên server hoặc cloud)
+  mediaUrls: [{ 
+    type: String 
   }],
-  mediaType: {
-    type: Number,
-    enum: [0, 1, 2, 3], // TEXT, IMAGE, VIDEO, MIXED
-    default: 0
+
+  mediaType: { 
+    type: String, 
+    enum: ['TEXT', 'IMAGE', 'VIDEO', 'MIXED'], 
+    default: 'TEXT' 
   },
-  timestamp: {
-    type: Date,
-    required: true,
-    index: true
-  },
-  likes: {
-    type: Number,
-    default: 0
-  },
-  shares: {
-    type: Number,
-    default: 0
-  },
-  isNFT: {
-    type: Boolean,
-    default: false
-  },
-  nftTokenId: {
-    type: Number,
-    default: 0
-  },
-  txHash: {
-    type: String,
-    required: true
-  },
-  blockNumber: {
-    type: Number
-  }
-}, {
-  timestamps: true
+
+  // Mảng chứa Address của người like (để check xem user hiện tại like chưa)
+  likes: [{ 
+    type: String, 
+    lowercase: true
+  }],
+
+  likesCount: { type: Number, default: 0 },
+  commentsCount: { type: Number, default: 0 },
+
+  isDeleted: { type: Boolean, default: false },
+
+  createdAt: { type: Date, default: Date.now }
 });
 
-postSchema.index({ blockchainId: 1 });
-postSchema.index({ author: 1, timestamp: -1 });
-postSchema.index({ timestamp: -1 });
-
-export default mongoose.model('Post', postSchema);
+export default mongoose.model("Post", PostSchema);
