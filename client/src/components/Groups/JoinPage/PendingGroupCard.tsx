@@ -1,33 +1,60 @@
-import { MoreHorizontal } from 'lucide-react';
-import { PendingGroup } from '../types/group';
+import { Lock, Clock } from 'lucide-react';
 
-export function PendingGroupCard({ group }: { group: PendingGroup }) {
+interface PendingGroupProps {
+  group: {
+    id: string;
+    name: string;
+    description: string;
+    avatarUrl: string;
+    memberCount: number;
+    privacy: 'PUBLIC' | 'PRIVATE';
+  };
+}
+
+export const PendingGroupCard = ({ group }: PendingGroupProps) => {
   return (
-    <div className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow">
-      <div className="flex items-start gap-4">
-        <img
-          src={group.image}
-          alt={group.name}
-          className="w-20 h-20 rounded-lg object-cover flex-shrink-0 border border-gray-200"
-        />
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">
-            {group.name}
-          </h3>
-          <p className="text-gray-600 text-sm">
-            Đã yêu cầu tham gia vào {group.requestedDate}
-          </p>
+    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 flex items-center gap-4 transition-all hover:shadow-md">
+      {/* Avatar Nhóm */}
+      <img
+        src={group.avatarUrl}
+        alt={group.name}
+        className="w-16 h-16 rounded-xl object-cover bg-gray-100 border border-gray-100 flex-shrink-0"
+      />
+
+      {/* Thông tin */}
+      <div className="flex-1 min-w-0">
+        <h3 className="font-semibold text-gray-900 text-lg truncate">
+          {group.name}
+        </h3>
+        
+        <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
+          {group.privacy === 'PRIVATE' && (
+            <span className="flex items-center gap-1">
+              <Lock size={14} /> Riêng tư
+            </span>
+          )}
+          <span>•</span>
+          <span>{group.memberCount} thành viên</span>
         </div>
       </div>
-      
-      <div className="flex gap-2 mt-4">
-        <button className="flex-1 bg-blue-50 text-blue-600 px-4 py-2 rounded-md hover:bg-blue-100 transition-colors font-medium text-sm">
-          Xem nhóm
-        </button>
-        <button className="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-md hover:bg-gray-200 transition-colors">
-          <MoreHorizontal className="w-5 h-5 text-gray-600" />
+
+      {/* Trạng thái / Action */}
+      <div className="flex flex-col items-end gap-2">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 text-yellow-700 text-sm font-medium rounded-full border border-yellow-100">
+          <Clock size={14} />
+          <span>Đang chờ duyệt</span>
+        </div>
+        
+        <button 
+          onClick={() => {
+             // Logic hủy yêu cầu nếu cần (call API delete request)
+             console.log("Cancel request for group", group.id);
+          }}
+          className="text-sm text-gray-400 hover:text-red-500 hover:underline transition-colors"
+        >
+          Hủy yêu cầu
         </button>
       </div>
     </div>
   );
-}
+};

@@ -1,0 +1,22 @@
+{
+  "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "abi": [
+    "event AdminAdded(uint256 indexed,address indexed)",
+    "event AdminRemoved(uint256 indexed,address indexed)",
+    "event GroupCreated(uint256 indexed,address indexed)",
+    "event MemberAdded(uint256 indexed,address indexed)",
+    "event MemberRemoved(uint256 indexed,address indexed)",
+    "function addAdmin(uint256,address)",
+    "function addMember(uint256,address)",
+    "function checkAdmin(uint256,address) view returns (bool)",
+    "function checkMembership(uint256,address) view returns (bool)",
+    "function checkOwnership(uint256,address) view returns (bool)",
+    "function createGroup() returns (uint256)",
+    "function groups(uint256) view returns (address,bool)",
+    "function isAdmin(uint256,address) view returns (bool)",
+    "function isMember(uint256,address) view returns (bool)",
+    "function leaveGroup(uint256)",
+    "function removeAdmin(uint256,address)",
+    "function removeMember(uint256,address)"
+  ]
+}

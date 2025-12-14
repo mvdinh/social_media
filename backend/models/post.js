@@ -37,7 +37,14 @@ const PostSchema = new mongoose.Schema({
 
   isDeleted: { type: Boolean, default: false },
 
+  group: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: "Group", 
+    default: null // Mặc định là null (bài viết cá nhân)
+  },
+
   createdAt: { type: Date, default: Date.now }
 });
 
+PostSchema.index({ group: 1, createdAt: -1 });
 export default mongoose.model("Post", PostSchema);

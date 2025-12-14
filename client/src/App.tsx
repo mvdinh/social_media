@@ -5,57 +5,62 @@ import Login from "./pages/Login";
 import Feed from "./pages/Feed";
 import Layout from "./pages/Layout";
 import CreateStoryModal from "./pages/CreateStory";
-import PostFeed from "./Test/ListPosts";
+// import PostFeed from "./Test/ListPosts"; // Commented out in your code
 
 import FriendsPage from "./components/Relationship/FriendsPage";
 import DonatePage from "./components/Donate/DonatePage";
-
 import FriendsListPage from "./components/Friend/FriendListPage";
 
-import GroupPage from "./components/Groups/GroupPage";
+// Group Components
 import JoinPage from "./components/Groups/JoinPage/JoinPage";
 import CreateGroupModal from "./components/Groups/CreateGroupModal";
-import GroupFeed from "./components/Groups/GroupFeed";
 import GroupDetail from "./components/Groups/GroupDetail";
-import ListPostPage from "./pages/ListPostPage";
+// import GroupPage from "./components/Groups/GroupPage";
 
-
+import { GroupProvider } from "./context/GroupContext";
 
 function App() {
   return (
-
     <Routes>
-
       {/* Redirect mặc định */}
       <Route path="/" element={<Navigate to="/login" />} />
 
       {/* Login */}
       <Route path="/login" element={<Login />} />
 
-      {/* Layout chính */}
-      <Route path="/" element={<Layout />}>
-
-        {/* <Route path="feed" element={<ListPostPage/>} /> */}
-        <Route path="feed" element={<Feed/>} />
-        <Route path="groups" element={<Connection />} />  {/* cái này hình như cũ rồi */}
-        <Route path="discover" element={<CreateStoryModal onClose={false} />} />
+      {/* ✅ Bọc GroupProvider ở đây để TOÀN BỘ các trang bên trong Layout 
+         đều có thể gọi useGroup() mà không bị lỗi.
+      */}
+      <Route 
+        element={
+          <GroupProvider>
+            <Layout />
+          </GroupProvider>
+        }
+      >
+        {/* Các Route con nằm trong Layout (Outlet) */}
+        <Route path="feed" element={<Feed />} />
+        
+        {/* Route cũ của bạn */}
+        <Route path="groups" element={<Connection />} /> 
+        
+        <Route path="discover" element={<CreateStoryModal onClose={() => {}} />} />
         <Route path="profile" element={<Profile />} />
         <Route path="profile/:profileId" element={<Profile />} />
+        
         <Route path="friends/requests" element={<FriendsPage />} />
         <Route path="friends" element={<FriendsListPage />} />
         <Route path="donation" element={<DonatePage />} />
 
-        {/* ✅ Route nhóm (KHÔNG cần LayoutGroup) */}
-        <Route path="groups">
-          {/* <Route path="feed" element={<GroupPage />} /> */}
-          <Route path="joins" element={<JoinPage />} />
-          <Route path="create" element={<CreateGroupModal/>} />
-          <Route path=":id" element={<GroupDetail/>} />
-        </Route>
+        {/* ✅ Route cho Groups (Viết phẳng ra cho dễ quản lý) */}
+        <Route path="groups/joins" element={<JoinPage />} />
+        <Route path="groups/create" element={<CreateGroupModal />} />
+        <Route path="groups/:id" element={<GroupDetail />} />
+        
+      </Route> 
+      {/* Kết thúc Route Layout */}
 
-      </Route>
     </Routes>
-
   );
 }
 

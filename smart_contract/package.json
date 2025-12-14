@@ -14,6 +14,7 @@
     "deploy2": "npx hardhat run scripts/deployDonation.js --network localhost",
     "deploy3": "npx hardhat run scripts/deployAccount.js --network localhost",
     "deploy4": "npx hardhat run scripts/deployGroup.js --network localhost",
+    "deployGr": "npx hardhat run scripts/deploy-group.js --network localhost",
     "deployAll": "npm run deploy && npm run deploy1 && npm run deploy2 && npm run deploy3 && npm run deploy4",
     "deploy:sepolia": "npx hardhat run scripts/deploy.js --network sepolia",
     "clean": "hardhat clean",
