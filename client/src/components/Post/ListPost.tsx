@@ -177,7 +177,7 @@ export const ListPost: React.FC<PostListProps> = ({
             </div>
 
             {/* Images */}
-            <ImageGrid mediaHashes={post.mediaHashes} />
+            <ImageGrid mediaHashes={post.mediaUrls} />
 
             {/* Stats */}
             <div className="px-4 py-2 flex items-center justify-between border-b border-gray-100">

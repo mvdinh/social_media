@@ -1,9 +1,9 @@
 // src/api/axiosClient.ts
-import axios, { 
-  AxiosError, 
-  AxiosInstance, 
-  InternalAxiosRequestConfig, 
-  AxiosResponse 
+import axios, {
+  AxiosError,
+  AxiosInstance,
+  InternalAxiosRequestConfig,
+  AxiosResponse
 } from "axios";
 import { RefreshResponse } from "../types/auth";
 
@@ -21,26 +21,47 @@ const axiosClient: AxiosInstance = axios.create({
   },
 });
 
+// ======================================================
 // 1. REQUEST INTERCEPTOR
+// ======================================================
 axiosClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem("accessToken");
+
+    // 🔐 Attach access token
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // ==================================================
+    // ✅ FIX QUAN TRỌNG: hỗ trợ FormData (upload ảnh/video)
+    // ==================================================
+    if (config.data instanceof FormData) {
+      // ❌ BẮT BUỘC xóa Content-Type
+      // 👉 Browser sẽ tự set multipart/form-data + boundary
+      delete config.headers["Content-Type"];
+    }
+
     return config;
   },
   (error: AxiosError) => Promise.reject(error)
 );
 
-// 2. RESPONSE INTERCEPTOR
+// ======================================================
+// 2. RESPONSE INTERCEPTOR (GIỮ NGUYÊN LOGIC CŨ)
+// ======================================================
 axiosClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as CustomAxiosRequestConfig;
 
-    // Kiểm tra lỗi 403 (hoặc 401 tùy backend) và chưa retry
-    if (error.response && error.response.status === 403 && originalRequest && !originalRequest._retry) {
+    // Retry khi token hết hạn (403 / 401 tùy backend)
+    if (
+      error.response &&
+      error.response.status === 403 &&
+      originalRequest &&
+      !originalRequest._retry
+    ) {
       originalRequest._retry = true;
 
       try {
@@ -50,33 +71,33 @@ axiosClient.interceptors.response.use(
           throw new Error("No refresh token available");
         }
 
-        // Gọi API refresh (Type response trả về là RefreshResponse)
+        // 🔄 Refresh token
         const { data } = await axios.post<RefreshResponse>(
-          `${API_BASE_URL}/auth/refresh`, 
+          `${API_BASE_URL}/auth/refresh`,
           { refreshToken }
         );
 
         if (data) {
-          // Lưu token mới
+          // 💾 Save new tokens
           localStorage.setItem("accessToken", data.accessToken);
           localStorage.setItem("refreshToken", data.refreshToken);
 
-          // Gắn token mới vào header request cũ
+          // 🔁 Attach new token
           if (originalRequest.headers) {
             originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
           }
 
-          // Gọi lại request cũ
+          // 🔁 Retry original request
           return axiosClient(originalRequest);
         }
       } catch (refreshError) {
         console.error("Refresh token failed:", refreshError);
-        
-        // Clear storage và redirect
+
+        // 🚪 Logout & redirect
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("userAddress");
-        
+
         window.location.href = "/login";
         return Promise.reject(refreshError);
       }

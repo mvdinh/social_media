@@ -288,7 +288,7 @@ const Feed = () => {
               onNext={handleNextStory} 
               onPrev={handlePrevStory} 
               isLoading={false}
-              // Bỏ currentUserAddress vì Modal tự check Token
+              
           />
       )}
 

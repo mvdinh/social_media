@@ -26,8 +26,11 @@ const UserSchema = new mongoose.Schema({
   // 2. PROFILE HIỂN THỊ
   username: { 
     type: String, 
-    default: "Unnamed User",
-    index: 'text' // Giúp tìm kiếm theo tên nhanh
+    // SỬA Ở ĐÂY: Dùng function thường để lấy giá trị từ this.address
+    default: function() {
+        return this.address; // Lấy toàn bộ address làm username mặc định
+    },
+    index: 'text' 
   },
   
   avatar: { 

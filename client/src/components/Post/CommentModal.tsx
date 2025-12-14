@@ -60,7 +60,7 @@ export function CommentModal({
                     </div>
                 </div>
                 <p className="text-gray-800 whitespace-pre-wrap mb-4">{post.content}</p>
-                <ModalImageGrid mediaHashes={post.mediaHashes} />
+                <ModalImageGrid mediaHashes={post.mediaUrls} />
              </div>
         </div>
 

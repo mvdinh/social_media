@@ -26,7 +26,7 @@ router.get("/:postId/comments", verifyToken, getComments);
 router.post(
   "/create", 
   verifyToken, 
-  uploadMiddleware.array("storyFile", 4), 
+  uploadMiddleware.array("files", 4), 
   createPost
 );
 

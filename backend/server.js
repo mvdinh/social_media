@@ -10,6 +10,7 @@ import authRoutes from "./routes/auth.route.js";
 import storyRoutes from "./routes/story.route.js"; 
 import postRoutes from "./routes/post.routes.js";
 import ipfsRoutes from "./routes/ipfs.route.js";
+import relationshipRoutes from "./routes/relationship.route.js";
 
 dotenv.config();
 
@@ -71,6 +72,7 @@ app.use("api/ipfs", ipfsRoutes);
 app.use("/api/auth", authRoutes);   
 app.use("/api/story", storyRoutes); 
 app.use("/api/posts", postRoutes);
+app.use("/api/relationships", relationshipRoutes);
 
 // 🔟 Start server
 const PORT = process.env.PORT || 3000;

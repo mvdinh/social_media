@@ -9,7 +9,7 @@ const generateAccessToken = (user) => {
   return jwt.sign(
     { id: user._id, address: user.address }, 
     ACCESS_SECRET, 
-    { expiresIn: "15m" } 
+    { expiresIn: "1h" } 
   );
 };
 
