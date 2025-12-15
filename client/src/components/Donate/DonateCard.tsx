@@ -3,7 +3,7 @@ import { Campaign } from "./DonatePage";
 import { DonateDialog } from "./DonateDialog";
 import { DonorsListDialog } from "./DonorsListDialog";
 import { Heart, Target, TrendingUp, Users, Archive } from "lucide-react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth1 } from "../../context/Context";
 
 interface DonateCardProps {
   campaign: Campaign;
@@ -12,7 +12,8 @@ interface DonateCardProps {
 }
 
 export function DonateCard({ campaign, onDonate, onArchive }: DonateCardProps) {
-  const { address } = useAuth();
+  const { user } = useAuth1();
+  const address = user?.address;
   const [isDonateDialogOpen, setIsDonateDialogOpen] = useState(false);
   const [isDonorsListOpen, setIsDonorsListOpen] = useState(false);
 

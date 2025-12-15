@@ -16,10 +16,17 @@ import JoinPage from "./components/Groups/JoinPage/JoinPage";
 import CreateGroupModal from "./components/Groups/CreateGroupModal";
 import GroupDetail from "./components/Groups/GroupDetail";
 // import GroupPage from "./components/Groups/GroupPage";
-
+import ChatPage from "./pages/Chat/ChatPage"
 import { GroupProvider } from "./context/GroupContext";
 
 function App() {
+  const address = localStorage.getItem("userAddress") || "{}";
+  const id =localStorage.getItem("id") || "{}";
+
+  const me = {
+    address: address|| "",
+    userId: id || "",
+  };
   return (
     <Routes>
       {/* Redirect mặc định */}
@@ -43,7 +50,7 @@ function App() {
         
         {/* Route cũ của bạn */}
         <Route path="groups" element={<Connection />} /> 
-        
+        <Route path="messages" element={<ChatPage me={me} />} />
         <Route path="discover" element={<CreateStoryModal onClose={() => {}} />} />
         <Route path="profile" element={<Profile />} />
         <Route path="profile/:profileId" element={<Profile />} />

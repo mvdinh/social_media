@@ -3,6 +3,7 @@ import { ThumbsUp, MessageCircle, MoreHorizontal, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion'; // Lưu ý: check lại thư viện motion/framer-motion
 import { CommentModal } from './CommentModal';
 import { Post } from '../types/post';
+import getUrl from '../../utils/getUrl';
 
 // Component hiển thị nhiều ảnh dạng Grid
 // Dữ liệu mediaHashes bây giờ là URL đầy đủ (http://localhost:3000/uploads/...)
@@ -155,7 +156,7 @@ export const ListPost: React.FC<PostListProps> = ({
             <div className="px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <img 
-                  src={post.avatar} 
+                  src={post?.avatarIpfsHash ? getUrl(post.avatarIpfsHash) : post.avatar} 
                   alt={post.authorName} 
                   className="w-10 h-10 rounded-full object-cover border border-gray-200"
                 />

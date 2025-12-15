@@ -57,7 +57,7 @@ const UserMenuDropdown = ({ user }: { user: any }) => {
       <div className="p-4 border-b border-gray-100">
         <div className="flex items-center space-x-3 cursor-pointer p-2 rounded-lg hover:bg-gray-100 transition duration-150">
           <img
-            src={user.avatar || "https://via.placeholder.com/150"}
+            src={user?.avatar}
             alt={user.name}
             className="h-14 w-14 rounded-full object-cover border border-gray-100"
           />

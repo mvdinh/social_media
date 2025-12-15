@@ -7,7 +7,7 @@ import {
   getPosts, 
   addComment,
   getComments
-} from "../controllers/postController.js";
+} from "../controllers/post.controller.js";
 
 const router = express.Router();
 

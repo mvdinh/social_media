@@ -36,6 +36,8 @@
     "multiformats": "^13.4.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-icons": "^5.5.0",
+    "react-modal": "^3.16.3",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.9.4",
     "socket.io-client": "^4.8.1",

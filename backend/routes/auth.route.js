@@ -1,5 +1,5 @@
 import express from "express";
-import { getNonce, login, requestRefreshToken, logout } from "../controllers/authController.js";
+import { getNonce, login, requestRefreshToken, logout } from "../controllers/auth.controller.js";
 
 const router = express.Router();
 

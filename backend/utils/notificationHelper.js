@@ -1,65 +1,58 @@
+// utils/notificationHelper.js
 import Notification from "../models/notification.js";
-import User from "../models/user.js"; // Import User để lấy thông tin avatar/tên người gửi
+import User from "../models/user.js"; // Import User model nếu cần populate sâu
 
-/**
- * Helper gửi thông báo Realtime + Lưu DB
- * @param {Object} req - Express request object (chứa io và userSocketMap)
- * @param {String} recipient - Address người nhận
- * @param {String} sender - Address người gửi
- * @param {String} type - Loại thông báo: 'LIKE_POST', 'COMMENT_POST', 'FOLLOW'
- * @param {String} postId - ID bài viết liên quan
- * @param {String} message - Nội dung text thông báo
- */
 export const sendNotification = async ({ req, recipient, sender, type, postId, message }) => {
   try {
-    // 1. Validation: Không gửi thông báo cho chính mình
+    // 1. Validate cơ bản
     if (!recipient || !sender) return;
-    if (recipient.toLowerCase() === sender.toLowerCase()) return;
+    
+    // Chuẩn hóa address
+    const recipientAddr = recipient.toLowerCase();
+    const senderAddr = sender.toLowerCase();
 
-    // 2. Lưu thông báo vào MongoDB (Persistence)
-    const newNotif = await Notification.create({
-      recipient: recipient.toLowerCase(),
-      sender: sender.toLowerCase(),
-      type,
-      postId,
-      message, // Lưu message gốc (VD: "đã thích bài viết...")
+    // Không gửi thông báo nếu tự like/comment bài mình
+    if (recipientAddr === senderAddr) return;
+
+    // 2. Tìm ID của người gửi (để lưu vào DB dạng ObjectId cho dễ populate sau này)
+    // Nếu sender truyền vào là address string, ta tìm user._id
+    const senderUser = await User.findOne({ address: senderAddr });
+    const senderId = senderUser ? senderUser._id : null;
+
+    // 3. Lưu Notification vào MongoDB
+    const newNotification = await Notification.create({
+      recipient: recipientAddr, // Lưu address người nhận
+      sender: senderId,         // Lưu ObjectId người gửi (để populate avatar)
+      type,                     // 'LIKE_POST', 'COMMENT_POST'
+      post: postId,
+      content: message,
       isRead: false,
       createdAt: new Date()
     });
 
-    // 3. Lấy thông tin chi tiết người gửi (Avatar, Name) để hiển thị đẹp trên UI
-    // (Bước này giúp Frontend không phải gọi thêm API để lấy avatar người gửi)
-    const senderProfile = await User.findOne({ address: sender.toLowerCase() }).select('cachedName cachedAvatar');
-    
-    const notifDataForSocket = {
-      _id: newNotif._id,
-      recipient,
-      sender: {
-        address: sender,
-        name: senderProfile?.cachedName || "Người dùng",
-        avatar: senderProfile?.cachedAvatar || "https://via.placeholder.com/150"
-      },
-      type,
-      postId,
-      message, 
-      createdAt: newNotif.createdAt,
-      isRead: false
-    };
+    // Populate thông tin người gửi (avatar, username) để hiển thị ngay trên UI
+    const populatedNotif = await Notification.findById(newNotification._id)
+        .populate("sender", "username avatar address");
 
-    // 4. Kiểm tra xem người nhận có đang Online không?
-    // req.userSocketMap được truyền từ middleware trong index.js
-    const receiverSocketId = req.userSocketMap.get(recipient.toLowerCase());
+    // 4. Gửi Real-time qua Socket.IO
+    // Lấy map và io từ req (đã được middleware ở server.js gán vào)
+    const socketMap = req.userSocketMap;
+    const io = req.io;
 
-    // 5. Nếu Online -> Bắn Socket ngay lập tức
-    if (receiverSocketId) {
-      req.io.to(receiverSocketId).emit("receive_notification", notifDataForSocket);
-      console.log(`🔔 Socket sent to [${recipient}]: ${type}`);
-    } else {
-      console.log(`zzz User [${recipient}] is offline. Notification saved to DB.`);
+    if (socketMap && io) {
+        // Tìm socketId của người nhận dựa trên address
+        const recipientSocketId = socketMap.get(recipientAddr);
+        
+        if (recipientSocketId) {
+            // Chỉ gửi cho đúng người đó
+            io.to(recipientSocketId).emit("new_notification", populatedNotif);
+            console.log(`🔔 Sent notification to ${recipientAddr} (Socket: ${recipientSocketId})`);
+        } else {
+            console.log(`zzz User ${recipientAddr} is offline. Notification saved to DB.`);
+        }
     }
 
   } catch (error) {
-    console.error("❌ Send Notification Error:", error);
-    // Không throw error để tránh làm crash luồng chính (VD: Like vẫn thành công dù lỗi notif)
+    console.error("❌ Notification Error:", error);
   }
 };

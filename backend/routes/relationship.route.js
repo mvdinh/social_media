@@ -7,7 +7,7 @@ import {
   acceptFriendRequest, 
   removeRelationship, 
   getFriends 
-} from "../controllers/relationshipController.js";
+} from "../controllers/relationship.controller.js";
 
 const router = express.Router();
 

@@ -1,73 +1,91 @@
 import React from "react";
-import { MoreHorizontal, Loader2, CheckCheck } from "lucide-react";
 import NotificationItem from "./NotificationItem";
-import { Notification, NotificationType, ActionType } from "../../types/notification";
+import { CheckCheck, BellOff } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-interface Props {
-  notifications: Notification[];
-  loading: boolean;
-  onAction: (type: NotificationType, action: ActionType, payload: any) => Promise<boolean>;
-  onRead: (id: string) => void;
-  onMarkAllRead: () => void;
-}
+const NotificationPanel = ({ 
+  notifications, 
+  loading, 
+  onRead,      // Hàm đánh dấu đã đọc (từ Hook)
+  onMarkAllRead // Hàm đánh dấu tất cả đã đọc (từ Hook)
+}) => {
+  const navigate = useNavigate();
 
-const NotificationPanel: React.FC<Props> = ({ notifications, loading, onAction, onRead, onMarkAllRead }) => {
+  // Xử lý khi click vào thông báo
+  const handleClick = (notif) => {
+    // 1. Gọi API đánh dấu đã đọc
+    if (!notif.isRead) {
+      onRead(notif._id);
+    }
+
+    // 2. Điều hướng tùy theo loại
+    if (notif.postId) {
+      // Nếu là like/comment -> Chuyển đến trang chi tiết bài viết
+      // Giả sử đường dẫn là /post/:id
+      navigate(`/post/${typeof notif.postId === 'object' ? notif.postId._id : notif.postId}`);
+    } else if (notif.type === "FOLLOW") {
+      // Nếu là follow -> Chuyển đến trang cá nhân người đó
+      navigate(`/profile/${notif.sender._id}`);
+    }
+  };
+
   return (
-    <div className="w-full max-w-md mx-auto bg-white shadow-xl rounded-xl border border-gray-200 overflow-hidden font-sans h-[600px] flex flex-col">
-      {/* Header */}
-      <div className="flex justify-between items-center p-4 border-b border-gray-100 sticky top-0 bg-white z-10 shadow-sm">
-        <h1 className="text-2xl font-bold text-gray-900">Thông báo</h1>
-        <div className="flex gap-1">
-            <button 
-                onClick={onMarkAllRead} 
-                className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600" title="Đánh dấu tất cả là đã đọc"
-            >
-                <CheckCheck className="h-5 w-5" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600">
-                <MoreHorizontal className="h-6 w-6" />
-            </button>
-        </div>
+    <div className="flex flex-col h-full w-full bg-white rounded-xl overflow-hidden shadow-xl border border-gray-200">
+      
+      {/* --- HEADER --- */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white sticky top-0 z-10">
+        <h2 className="text-xl font-bold text-gray-800">Thông báo</h2>
+        
+        {notifications.length > 0 && (
+          <button 
+            onClick={onMarkAllRead}
+            className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-md transition"
+            title="Đánh dấu tất cả là đã đọc"
+          >
+            <CheckCheck className="w-4 h-4" />
+            <span>Đã đọc tất cả</span>
+          </button>
+        )}
       </div>
 
-      {/* Tabs */}
-      <div className="flex space-x-2 px-4 py-3 bg-white">
-        <button className="px-4 py-1.5 rounded-full bg-blue-100 text-blue-700 font-bold text-sm transition">
-          Tất cả
-        </button>
-        <button className="px-4 py-1.5 rounded-full text-gray-600 font-semibold text-sm hover:bg-gray-100 transition">
-          Chưa đọc
-        </button>
+      {/* --- BODY LIST --- */}
+      <div className="flex-1 overflow-y-auto p-2 scrollbar-hide custom-scrollbar">
+        {loading ? (
+          // Loading Skeleton
+          <div className="space-y-3 p-2">
+             {[1, 2, 3, 4].map((i) => (
+               <div key={i} className="flex gap-3 animate-pulse">
+                 <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+                 <div className="flex-1 space-y-2 py-1">
+                   <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                   <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+                 </div>
+               </div>
+             ))}
+          </div>
+        ) : notifications.length === 0 ? (
+          // Empty State
+          <div className="flex flex-col items-center justify-center h-full text-gray-400 mt-10">
+            <BellOff className="w-16 h-16 mb-2 opacity-50" />
+            <p>Bạn chưa có thông báo nào</p>
+          </div>
+        ) : (
+          // List Notifications
+          <div className="space-y-1">
+            {notifications.map((notif) => (
+              <NotificationItem 
+                key={notif._id} 
+                notification={notif} 
+                onClick={() => handleClick(notif)}
+              />
+            ))}
+          </div>
+        )}
       </div>
-
-      {/* List */}
-      <div className="flex-1 overflow-y-auto px-2 pb-4 scrollbar-thin scrollbar-thumb-gray-200">
-        <div className="px-2 py-2">
-          <h3 className="text-base font-semibold text-gray-700 mb-2">Mới nhất</h3>
-          
-          {loading ? (
-            <div className="flex flex-col items-center justify-center h-48 text-gray-400">
-              <Loader2 className="h-8 w-8 animate-spin mb-2 text-blue-500" />
-              <p className="text-sm font-medium">Đang tải...</p>
-            </div>
-          ) : notifications.length === 0 ? (
-            <div className="text-center py-10 text-gray-500 text-sm flex flex-col items-center">
-               <span className="text-4xl mb-2">🔕</span>
-              Bạn không có thông báo nào.
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {notifications.map((item) => (
-                <NotificationItem 
-                  key={item.id} 
-                  data={item} 
-                  onAction={onAction} 
-                  onRead={onRead} 
-                />
-              ))}
-            </div>
-          )}
-        </div>
+      
+      {/* Footer (Optional) */}
+      <div className="p-2 border-t border-gray-100 text-center">
+         <button className="text-sm text-blue-600 hover:underline">Xem tất cả</button>
       </div>
     </div>
   );

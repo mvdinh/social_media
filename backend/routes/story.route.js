@@ -5,11 +5,11 @@ import {
   getStories, 
   createStory, 
   viewStoryProxy 
-} from "../controllers/storyController.js";
+} from "../controllers/story.controller.js";
 import { 
   createReaction, 
   getReactions 
-} from "../controllers/reactionController.js";
+} from "../controllers/reaction.controller.js";
 
 const router = express.Router();
 

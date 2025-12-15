@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth1 } from "../../context/Context";
 import { toast, Toaster } from "sonner";
 import FriendCard from "./FriendCard";
 import { Loader2, Users, UserPlus, RefreshCw } from "lucide-react";
@@ -17,7 +17,8 @@ export interface Friend {
 }
 
 const FriendsPage = () => {
-  const { address } = useAuth();
+  const { user } = useAuth1();
+  const address = user?.address;
   const { socket } = useSocket();
 
   const [pendingRequests, setPendingRequests] = useState<Friend[]>([]);

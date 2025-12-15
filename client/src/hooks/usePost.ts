@@ -5,11 +5,10 @@ import { useSocket } from '../context/SocketContext';
 import { getTimeAgo } from '../utils/getTimeAgo';
 import { Post, Comment, MediaType } from '../types/post';
 
-export const usePosts = () => {
+export const usePosts = (groupId?: string) => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal comment
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [commentText, setCommentText] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -29,26 +28,19 @@ export const usePosts = () => {
 
     return {
       id: p._id,
-
       author: p.owner?.address || p.owner,
       authorName: p.owner?.username || 'Người dùng',
       avatar:
         p.owner?.avatar ||
         `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.owner?._id || 'default'}`,
-
       content: p.content || '',
-
-      // 🔥 QUAN TRỌNG
       mediaUrls,
       mediaType,
-
       likes: p.likesCount || 0,
       isLiked: p.isLikedByCurrentUser || false,
       commentsCount: p.commentsCount || 0,
-
       timestamp: new Date(p.createdAt).getTime(),
       time: getTimeAgo(new Date(p.createdAt).getTime()),
-
       isDeleted: p.isDeleted || false,
       comments: []
     };
@@ -60,7 +52,10 @@ export const usePosts = () => {
   const loadPosts = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axiosClient.get('/posts');
+
+      const url = groupId ? `/groups/${groupId}/posts` : '/posts';
+      const res = await axiosClient.get(url);
+
       const formatted = res.data.map(mapPostData);
       setPosts(formatted);
       console.log('Bảng tin đã được tải', formatted);
@@ -70,7 +65,7 @@ export const usePosts = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [groupId]);
 
   // --------------------------------------------------------
   // SOCKET LISTENERS
@@ -86,17 +81,13 @@ export const usePosts = () => {
 
     const onLikeUpdate = ({ postId, likesCount }: any) => {
       setPosts(prev =>
-        prev.map(p =>
-          p.id === postId ? { ...p, likes: likesCount } : p
-        )
+        prev.map(p => (p.id === postId ? { ...p, likes: likesCount } : p))
       );
     };
 
     const onCommentCount = ({ postId, count }: any) => {
       setPosts(prev =>
-        prev.map(p =>
-          p.id === postId ? { ...p, commentsCount: count } : p
-        )
+        prev.map(p => (p.id === postId ? { ...p, commentsCount: count } : p))
       );
     };
 
@@ -219,7 +210,6 @@ export const usePosts = () => {
     commentText,
     setCommentText,
     isSubmittingComment,
-
     loadPosts,
     handleLike,
     handleOpenComments,

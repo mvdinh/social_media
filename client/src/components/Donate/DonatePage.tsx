@@ -4,7 +4,7 @@ import { toast, Toaster } from "sonner";
 import { DonateCard } from "./DonateCard";
 import { CreateCampaignDialog } from "./CreateCampaignDialog";
 import { ArchivedCampaignsDialog } from "./ArchivedCampaignsDialog";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth1 } from "../../context/Context";
 
 export interface Donation {
   id: string;
@@ -25,7 +25,8 @@ export interface Campaign {
 }
 
 const DonatePage = () => {
-  const { address, contracts } = useAuth();
+  const { user, contracts } = useAuth1();
+  const address = user?.address;
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [archivedCampaigns, setArchivedCampaigns] = useState<Campaign[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);

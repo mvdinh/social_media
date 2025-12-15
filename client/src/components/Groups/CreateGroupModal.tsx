@@ -2,17 +2,19 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Lock, Globe, Image as ImageIcon, Check, Loader2 } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
+import { useAuth1 } from '../../context/Context';
 
 // 1. Import Hook từ GroupContext (Nơi chứa logic Blockchain + API)
-import { useGroup } from '../../context/GroupContext'; 
+
 
 type PrivacyType = 'public' | 'private';
 
 const CreateGroupPage = () => {
   const navigate = useNavigate();
+  const { contracts , user} = useAuth1();
+  const groupContract = contracts?.["group"];
+  const address = user?.address;
   
-  // Lấy hàm createGroup và trạng thái loading từ Context
-  const { createGroup, isLoading } = useGroup(); 
 
   // State Form
   const [groupName, setGroupName] = useState('');

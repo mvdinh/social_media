@@ -21,6 +21,7 @@ export interface Post {
   author: string;     // Address
   authorName: string; // Username hiển thị
   avatar: string;     // URL Avatar
+  avatarIpfsHash?: string; // IPFS Hash mã cid ảnh đại diện
   
   content: string;
   mediaHashes: string[]; // Frontend cũ dùng tên này, ta giữ nguyên nhưng map data là URL

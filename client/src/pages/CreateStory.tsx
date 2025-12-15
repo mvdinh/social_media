@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Edit3, Image as ImageIcon, Star } from "lucide-react";
-import axiosClient from '../api/axiosClient'; // Import axios client đã config
+import { ArrowLeft, Edit3, Image as ImageIcon, Star, X } from "lucide-react";
+import axiosClient from '../api/axiosClient';
 
 const MAX_VIDEO_DURATION_SECONDS = 60;
 
 const CreateStoryModal = ({ onClose }) => {
     const colorPalette = ["bg-blue-600", "bg-purple-600", "bg-red-500", "bg-pink-500", "bg-green-500", "bg-teal-500"];
 
+    // --- LOGIC GIỮ NGUYÊN ---
     const [statusMessage, setStatusMessage] = useState(null);
     const [storyText, setStoryText] = useState("");
     const [selectedColor, setSelectedColor] = useState("bg-purple-600");
@@ -19,10 +20,9 @@ const CreateStoryModal = ({ onClose }) => {
     const fileInputRef = useRef(null);
     const videoRef = useRef(null);
     
-    const baseButtonClass = "flex items-center justify-center py-2 px-4 rounded-lg font-semibold text-sm transition duration-150";
+    const baseButtonClass = "flex items-center justify-center py-2 px-3 rounded-lg font-semibold text-sm transition duration-150"; // Giảm padding nút
     
     const isVideo = selectedFile && selectedFile.type.startsWith('video/');
-    const isImage = selectedFile && selectedFile.type.startsWith('image/');
     
     const handlePhotoUploadClick = () => {
         setStoryType("Photo");
@@ -59,19 +59,16 @@ const CreateStoryModal = ({ onClose }) => {
         }
     };
 
-    // --- HANDLE SUBMIT ---
     const handleSubmit = async () => {
         if (isLoading) return;
         setStatusMessage(null);
 
-        // 1. Kiểm tra Token đăng nhập
         const token = localStorage.getItem("accessToken");
         if (!token) {
             setStatusMessage("⚠️ Bạn chưa đăng nhập. Vui lòng Sign In lại.");
             return;
         }
         
-        // 2. Validate dữ liệu
         if ((storyType === "Text" && !storyText.trim()) || 
             ((storyType === "Photo" || storyType === "Video") && !selectedFile)) {
             return;
@@ -80,19 +77,16 @@ const CreateStoryModal = ({ onClose }) => {
         setIsLoading(true);
 
         const formData = new FormData();
-        // Không cần gửi 'owner' nữa, backend tự lấy từ token
         formData.append("type", storyType); 
 
         try {
             if (storyType === "Video" || storyType === "Photo") {
-                // Field name 'storyFile' phải khớp với uploadMiddleware.single('storyFile')
                 formData.append("storyFile", selectedFile); 
             } else {
                 formData.append("content", storyText);
                 formData.append("backgroundColor", selectedColor);
             }
 
-            // 3. Gọi API Backend (axiosClient tự gắn Token)
             const response = await axiosClient.post("/story/create", formData, {
                 headers: { "Content-Type": "multipart/form-data" }
             });
@@ -102,8 +96,6 @@ const CreateStoryModal = ({ onClose }) => {
             if (!success) throw new Error("Tải lên thất bại.");
 
             console.log("✅ Story Created:", story);
-
-            // 4. Thành công -> Đóng Modal
             onClose();
 
         } catch (error) {
@@ -119,93 +111,114 @@ const CreateStoryModal = ({ onClose }) => {
         }
     }
 
-    // Cleanup preview
     useEffect(() => {
         return () => {
             if (filePreview) URL.revokeObjectURL(filePreview);
         };
     }, [filePreview]);
 
+    // --- UI ĐÃ TỐI ƯU CHIỀU CAO ---
     return (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="w-full max-w-md bg-white rounded-xl shadow-2xl relative">
-                {/* Header */}
-                <div className="flex items-center p-4 border-b border-gray-100">
-                    <button onClick={onClose} className="text-gray-600 hover:text-gray-900 transition mr-4">
-                        <ArrowLeft className="h-6 w-6" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            {/* max-h-[90vh]: Đảm bảo không bao giờ cao hơn màn hình */}
+            <div className="w-full max-w-md bg-white rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
+                
+                {/* 1. Header (Cố định) */}
+                <div className="flex items-center justify-between p-3 border-b border-gray-100 shrink-0">
+                    <h2 className="text-lg font-bold text-gray-800">Tạo tin mới</h2>
+                    <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-500">
+                        <X className="h-5 w-5" />
                     </button>
-                    <h2 className="text-xl font-semibold text-gray-800">Create Story</h2>
                 </div>
 
-                <div className="p-6">
+                {/* 2. Body (Cuộn nếu nội dung dài) */}
+                <div className="p-4 overflow-y-auto custom-scrollbar flex-1">
                     <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,video/*" />
 
-                    {/* Preview Area */}
-                    <div className={`relative h-96 w-full rounded-xl shadow-xl flex items-center justify-center p-6 mb-6 transition-colors ${storyType === "Text" ? selectedColor : "bg-gray-900"}`}>
+                    {/* Preview Area: Giảm chiều cao từ h-96 xuống h-60 (hoặc aspect-video) */}
+                    <div className={`relative h-60 w-full rounded-xl shadow-inner flex items-center justify-center p-4 mb-4 transition-colors overflow-hidden ${storyType === "Text" ? selectedColor : "bg-gray-900"}`}>
                         {storyType === "Text" ? (
-                            <textarea 
-                                className="w-full h-full bg-transparent text-white text-2xl placeholder-white/80 resize-none border-none focus:outline-none text-center pt-16"
-                                placeholder="What's on your mind?"
-                                maxLength={200}
-                                value={storyText}
-                                onChange={(e) => setStoryText(e.target.value)}
-                            />
+                            <>
+                                <textarea 
+                                    className="w-full h-full bg-transparent text-white text-xl font-medium placeholder-white/70 resize-none border-none focus:outline-none text-center flex items-center justify-center pt-8 pb-8 custom-scrollbar"
+                                    placeholder="Bạn đang nghĩ gì?"
+                                    maxLength={200}
+                                    value={storyText}
+                                    onChange={(e) => setStoryText(e.target.value)}
+                                />
+                                {/* Color Palette: Đưa vào trong preview để tiết kiệm chỗ */}
+                                <div className="absolute bottom-3 flex space-x-2 z-10 bg-black/20 p-1.5 rounded-full backdrop-blur-sm">
+                                    {colorPalette.map((color, index) => (
+                                        <div 
+                                            key={index} 
+                                            onClick={() => setSelectedColor(color)} 
+                                            className={`h-5 w-5 rounded-full border border-white/50 cursor-pointer transition-transform hover:scale-110 ${color} ${selectedColor === color ? "ring-2 ring-white scale-110" : ""}`}
+                                        />
+                                    ))}
+                                </div>
+                            </>
                         ) : (
                             filePreview ? (
                                 isVideo ? (
-                                    <video ref={videoRef} src={filePreview} loop className="h-full w-full object-contain rounded-lg" />
+                                    <video ref={videoRef} src={filePreview} loop autoPlay muted className="h-full w-full object-contain" />
                                 ) : (
-                                    <img src={filePreview} alt="Preview" className="h-full w-full object-contain rounded-lg" />
+                                    <img src={filePreview} alt="Preview" className="h-full w-full object-contain" />
                                 )
                             ) : (
-                                <div className="flex flex-col items-center justify-center text-white/80">
-                                    <ImageIcon className="h-16 w-16 mb-4" />
-                                    <p className="text-xl font-semibold">Thêm ảnh hoặc video</p>
-                                    <button onClick={handlePhotoUploadClick} className="mt-6 bg-white/20 text-white px-5 py-2 rounded-full text-base font-bold hover:bg-white/30 transition">
-                                        Chọn từ thư viện
-                                    </button>
+                                <div 
+                                    onClick={handlePhotoUploadClick}
+                                    className="flex flex-col items-center justify-center text-white/60 cursor-pointer hover:text-white transition"
+                                >
+                                    <ImageIcon className="h-10 w-10 mb-2" />
+                                    <p className="text-sm font-medium">Chọn ảnh/video</p>
                                 </div>
                             )
                         )}
                     </div>
 
-                    {/* Color Palette */}
-                    {storyType === "Text" && (
-                        <div className="flex items-center justify-center space-x-3 mb-6">
-                            {colorPalette.map((color, index) => (
-                                <div key={index} onClick={() => setSelectedColor(color)} className={`h-6 w-6 rounded-full border-2 border-white cursor-pointer ${color} ${selectedColor === color ? "shadow-lg ring-4 ring-purple-300" : "ring-1 ring-gray-300"}`}></div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Type Buttons */}
-                    <div className="flex space-x-3 mb-4">
-                        <button onClick={() => setStoryType("Text")} className={`${baseButtonClass} flex-1 ${storyType === "Text" ? "bg-purple-100 border border-purple-300 text-purple-700" : "bg-white border border-gray-300 text-gray-700"}`}>
-                            <Edit3 className="h-4 w-4 mr-2" /> Text
+                    {/* Type Buttons: Giảm margin bottom */}
+                    <div className="flex space-x-2 mb-3">
+                        <button onClick={() => setStoryType("Text")} className={`${baseButtonClass} flex-1 ${storyType === "Text" ? "bg-purple-50 border border-purple-200 text-purple-700" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+                            <Edit3 className="h-4 w-4 mr-2" /> Văn bản
                         </button>
-                        <button onClick={handlePhotoUploadClick} className={`${baseButtonClass} flex-1 ${storyType === "Photo" || storyType === "Video" ? "bg-purple-100 border border-purple-300 text-purple-700" : "bg-gray-100 border border-gray-300 text-gray-700"}`}>
-                            <ImageIcon className="h-4 w-4 mr-2" /> Photo/Video
+                        <button onClick={handlePhotoUploadClick} className={`${baseButtonClass} flex-1 ${storyType === "Photo" || storyType === "Video" ? "bg-purple-50 border border-purple-200 text-purple-700" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+                            <ImageIcon className="h-4 w-4 mr-2" /> Ảnh/Video
                         </button>
                     </div>
 
                     {/* Status Message */}
                     {statusMessage && (
-                        <p className={`text-center mb-3 text-sm font-medium ${statusMessage.startsWith('❌') ? 'text-red-500' : 'text-gray-600'}`}>
+                        <p className={`text-center mb-2 text-xs font-medium ${statusMessage.startsWith('❌') ? 'text-red-500' : 'text-gray-500'}`}>
                             {statusMessage}
                         </p>
                     )}
+                </div>
 
-                    {/* Submit Button */}
+                {/* 3. Footer (Cố định nút Submit) */}
+                <div className="p-3 border-t border-gray-100 shrink-0 bg-white">
                     <button 
                         onClick={handleSubmit} 
                         disabled={isLoading || (storyType === "Text" && !storyText.trim()) || ((storyType === "Photo" || storyType === "Video") && !selectedFile)}
-                        className={`${baseButtonClass} w-full text-white`}
-                        style={{ backgroundImage: "linear-gradient(to right, #6d28d9, #9333ea, #a855f7)" }}
+                        className={`${baseButtonClass} w-full text-white shadow-md hover:shadow-lg transform active:scale-95`}
+                        style={{ backgroundImage: "linear-gradient(to right, #7c3aed, #9333ea)" }}
                     >
-                        <Star className="h-5 w-5 mr-2 fill-white text-white" />
-                        {isLoading ? "Đang xử lý..." : "Create Story"}
+                        {isLoading ? (
+                            <span className="flex items-center">
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Đang xử lý...
+                            </span>
+                        ) : (
+                            <>
+                                <Star className="h-4 w-4 mr-2 fill-white" />
+                                Chia sẻ tin
+                            </>
+                        )}
                     </button>
                 </div>
+
             </div>
         </div>
     );
