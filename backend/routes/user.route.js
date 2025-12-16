@@ -1,8 +1,10 @@
 // routes/user.js - P2P Version (No messaging key)
 import express from 'express';
-import { verifyTokenId } from '../middleware/auth.js';
+import { verifyToken, verifyTokenId} from '../middleware/auth.js';
 import User from '../models/user.js';
 import { getOnlineAddress } from '../services/signalingServer.js';
+import { updateProfile, getUserById } from '../controllers/user.controller.js';
+import { uploadMiddleware } from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -152,5 +154,12 @@ router.get('/:address', verifyTokenId, async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
+const uploadFields = uploadMiddleware.fields([
+  { name: 'avatar', maxCount: 1 },     // Key gửi lên là 'avatar'
+  { name: 'coverImage', maxCount: 1 }  // Key gửi lên là 'coverImage'
+]);
 
+// PUT: /api/user/profile
+router.put("/update/profile", verifyToken, uploadFields, updateProfile);
+router.get("/:id",verifyToken, getUserById);
 export default router;

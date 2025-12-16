@@ -1,40 +1,50 @@
-const hre = require("hardhat");
-const fs = require("fs");     
-const path = require("path");  
+// scripts/deployProfile.js
+import hre from "hardhat";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+// Tạo __dirname cho ES Module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function main() {
+  console.log("🚀 Deploying Profile contract...");
 
-    const UserProfile = await hre.ethers.getContractFactory("Profile");
-    const userProfile = await UserProfile.deploy();
+  // 1. Deploy contract Profile
+  const Profile = await hre.ethers.getContractFactory("Profile");
+  const profile = await Profile.deploy();
+  await profile.waitForDeployment();
 
-    await userProfile.waitForDeployment();
-    const profileAddress = await userProfile.getAddress();
-    
-    console.log(`UserProfile deployed to: ${profileAddress}`);
+  console.log("✅ Profile deployed to:", profile.target);
 
-    const configDir = path.join(__dirname, "..", "..", "client", "src", "config");
-    
-    if (!fs.existsSync(configDir)) {
-        fs.mkdirSync(configDir, { recursive: true });
-    }
+  // 2. Lấy ABI chuẩn ethers v6
+  const abiString = profile.interface.format("json");
+  const abi = typeof abiString === "string" ? JSON.parse(abiString) : abiString;
 
-    const addressFile = path.join(configDir, "contract-addresses.json");
-    fs.writeFileSync(
-        addressFile,
-        JSON.stringify({ Profile: profileAddress }, null, 2)
-    );
-    console.log(`💾 Saved addresses to: ${addressFile}`);
+  // 3. Đường dẫn lưu file JSON cho frontend
+  const frontendPath = path.join(
+    __dirname,
+    "../../client/src/contracts/profile.json"
+  );
 
+  // 4. Tạo object lưu address + abi
+  const data = {
+    address: profile.target,
+    abi,
+  };
 
-    const artifact = await hre.artifacts.readArtifact("Profile"); 
+  // 5. Tạo folder nếu chưa tồn tại
+  fs.mkdirSync(path.dirname(frontendPath), { recursive: true });
 
-    const abiFile = path.join(configDir, "Profile.json");
-    fs.writeFileSync(abiFile, JSON.stringify(artifact, null, 2)); 
-    
-    console.log(`💾 Saved ABI to: ${abiFile}`);
+  // 6. Ghi file JSON
+  fs.writeFileSync(frontendPath, JSON.stringify(data, null, 2));
+
+  console.log("📦 ABI + address saved to frontend:", frontendPath);
 }
 
+// Chạy main
 main().catch((error) => {
-    console.error("❌ Deployment failed:", error);
-    process.exitCode = 1;
+  console.error("❌ Deploy failed:", error);
+  process.exitCode = 1;
 });

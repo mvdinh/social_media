@@ -82,7 +82,11 @@ export function CommentModal({
                             <img src={comment.avatar} alt="avt" className="w-8 h-8 rounded-full border border-gray-200 flex-shrink-0" />
                             <div>
                                 <div className="bg-gray-100 rounded-2xl px-3 py-2">
-                                    <span className="font-semibold text-sm block">{comment.authorName || "User"}</span>
+                                    <span className="font-semibold text-sm block">
+                                       {post.authorName.length > 15
+                                        ? post.authorName.slice(0, 15) + "..."
+                                        : post.authorName}
+                                    </span>
                                     <span className="text-sm text-gray-800">{comment.content}</span>
                                 </div>
                                 <div className="text-xs text-gray-500 mt-1 ml-2">{comment.time}</div>

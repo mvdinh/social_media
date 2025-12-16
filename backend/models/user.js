@@ -21,36 +21,49 @@ const UserSchema = new mongoose.Schema({
   },
 
   // =====================
-  // PROFILE
+  // PROFILE CƠ BẢN
   // =====================
   username: { 
     type: String,
-    default: function () {
-      return this.address;
-    },
+    default: function () { return this.address; },
     index: "text"
   },
 
-  // Avatar hiển thị
+  // Avatar
   avatar: {
     type: String,
     default: function () {
       if (!this.address) return "";
-
       const letter = this.address.slice(-1).toUpperCase();
       return `https://ui-avatars.com/api/?name=${letter}&background=0D8ABC&color=ffffff&size=256&bold=true`;
     }
   },
+  avatarIpfsHash: { type: String, default: null },
 
-  // IPFS hash chỉ có khi user upload avatar/profile
-  avatarIpfsHash: { 
+  // =====================
+  // ✅ CÁC TRƯỜNG MỚI THÊM
+  // =====================
+  
+  // 1. Ảnh bìa (Cover Image)
+  coverImage: { type: String, default: "" }, 
+  coverImageIpfsHash: { type: String, default: null }, // Lưu hash IPFS của ảnh bìa
+
+  // 2. Thông tin cá nhân chi tiết
+  bio: { type: String, default: "" },
+  
+  dob: { type: Date, default: null }, // Ngày sinh
+  
+  hometown: { type: String, default: "" }, // Quê quán
+  
+  relationshipStatus: { 
     type: String, 
-    default: null 
+    enum: ["Độc thân", "Đang hẹn hò", "Đã kết hôn", "Đã ly hôn", "Phức tạp", ""], // Giới hạn các giá trị
+    default: "" 
   },
 
-  bio: { type: String, default: "" },
-  coverImage: { type: String, default: "" },
-
+  // =====================
+  // SOCIAL GRAPH
+  // =====================
   followers: [{ type: String, lowercase: true }],
   following: [{ type: String, lowercase: true }],
 
