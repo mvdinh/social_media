@@ -5,7 +5,7 @@ import { CreateGroupPostBox, CreatePostBox } from './group/CreateGroupPostBox';
 import { PostList } from './group/PostList';
 import { GroupSidebar } from './group/GroupSidebar';
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth1 } from '../../context/Context';
 import { Loader2 } from 'lucide-react';
 import { GroupPostList } from './group/GroupPostList';
 
@@ -25,7 +25,7 @@ interface GroupData {
 const GroupDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState('discussion');
-  const { address, contracts } = useAuth();
+  const { user, contracts } = useAuth1();
   const groupContract = contracts?.["group"];
   
   const [groupData, setGroupData] = useState<GroupData | null>(null);
@@ -46,7 +46,8 @@ const GroupDetail = () => {
         console.log('📡 Fetching group data for ID:', id);
 
         // Lấy dữ liệu từ contract
-        const rawGroup = await groupContract.getGroup(id);
+       
+      const rawGroup = await groupContract.getGroup(id);
         console.log('✅ Raw group from contract:', rawGroup);
 
         // Parse dữ liệu từ contract

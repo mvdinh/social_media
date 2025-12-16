@@ -18,6 +18,7 @@ import GroupDetail from "./components/Groups/GroupDetail";
 // import GroupPage from "./components/Groups/GroupPage";
 import ChatPage from "./pages/Chat/ChatPage"
 import { GroupProvider } from "./context/GroupContext";
+import ProfilePage from "./pages/Profile/ProfilePage";
 
 function App() {
   const address = localStorage.getItem("userAddress") || "{}";
@@ -52,8 +53,8 @@ function App() {
         <Route path="groups" element={<Connection />} /> 
         <Route path="messages" element={<ChatPage me={me} />} />
         <Route path="discover" element={<CreateStoryModal onClose={() => {}} />} />
-        <Route path="profile" element={<Profile />} />
-        <Route path="profile/:profileId" element={<Profile />} />
+
+        <Route path="profile" element={<ProfilePage/>} />
         
         <Route path="friends/requests" element={<FriendsPage />} />
         <Route path="friends" element={<FriendsListPage />} />
@@ -62,7 +63,7 @@ function App() {
         {/* ✅ Route cho Groups (Viết phẳng ra cho dễ quản lý) */}
         <Route path="groups/joins" element={<JoinPage />} />
         <Route path="groups/create" element={<CreateGroupModal />} />
-        <Route path="groups/:id" element={<GroupDetail />} />
+        <Route path="groups/:id" element={<GroupDetail/>} />
         
       </Route> 
       {/* Kết thúc Route Layout */}

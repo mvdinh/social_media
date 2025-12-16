@@ -161,5 +161,5 @@ const uploadFields = uploadMiddleware.fields([
 
 // PUT: /api/user/profile
 router.put("/update/profile", verifyToken, uploadFields, updateProfile);
-router.get("/:id",verifyToken, getUserById);
+router.get(":id",verifyTokenId, getUserById);
 export default router;

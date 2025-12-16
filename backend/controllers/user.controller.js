@@ -6,7 +6,7 @@ import { ethers } from "ethers";
 // ==========================================
 export const getUserById = async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = req.userId;
     
     // Tìm user theo _id hoặc address
     const user = await User.findOne({ 
@@ -21,20 +21,21 @@ export const getUserById = async (req, res) => {
     }
 
     res.json({
-      success: true,
-      user: {
-        _id: user._id,
-        address: user.address,
-        username: user.username,
-        bio: user.bio,
-        local: user.hometown,
-        birthDate: user.dob,
-        relationshipStatus: user.relationshipStatus,
-        avatar: user.avatarIpfsHash, 
-        coverPhotoUrl: user.coverImageIpfsHash,
-        email: user.email 
-      }
-    });
+  success: true,
+  user: {
+    _id: user._id,
+    address: user.address,
+    username: user.username,
+    bio: user.bio,
+    local: user.hometown,
+    birthDate: user.dob,
+    relationshipStatus: user.relationshipStatus,
+    avatar: user.avatarIpfsHash, 
+    coverPhotoUrl: user.coverImageIpfsHash,
+    email: user.email 
+  }
+});
+
   } catch (error) {
     console.error("Get User Error:", error);
     res.status(500).json({ error: error.message });

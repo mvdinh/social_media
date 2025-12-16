@@ -1,15 +1,16 @@
 import React from 'react';
 import { Toaster } from 'sonner';
-import { useAuth } from '../../../context/AuthContext';
-import { ListPost } from '../../Post/ListPost';
-import { usePosts } from '../../../hooks/usePost';
+import { useAuth1 } from '../../../context/Context';
+import { ListPost } from './PostGroup/ListPost';
+import { usePostGroup } from '../../../hooks/usePostGroup';
 
 interface GroupPostListProps {
   groupId: number;
 }
 
 export const GroupPostList: React.FC<GroupPostListProps> = ({ groupId }) => {
-  const { address, contracts } = useAuth();
+  const { user, contracts } = useAuth1();
+  const address = user?.address 
   const groupContract = contracts?.["group"];
 
   const {
@@ -22,7 +23,7 @@ export const GroupPostList: React.FC<GroupPostListProps> = ({ groupId }) => {
     handleOpenComments,
     handleCloseComments,
     handleAddComment
-  } = usePosts({
+  } = usePostGroup({
     contract: groupContract,
     address: address,
     groupId: groupId 

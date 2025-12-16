@@ -1,5 +1,4 @@
-import { useState, useRef } from 'react';
-import { X, Image as ImageIcon, Users as UsersIcon, MapPin, Smile, MoreHorizontal } from 'lucide-react';
+import { X, Image as ImageIcon, Users as UsersIcon, MapPin, Smile, MoreHorizontal, Loader2 } from 'lucide-react';
 
 interface CreatePostModalProps {
   onClose: () => void;
@@ -7,41 +6,45 @@ interface CreatePostModalProps {
     name: string;
     avatar: string;
   };
+  postText: string;
+  setPostText: (text: string) => void;
+  selectedImages: string[];
+  isAnonymous: boolean;
+  setIsAnonymous: (value: boolean) => void;
+  handleImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  removeImage: (index: number) => void;
+  handleCreatePost: () => void;
+  isCreating: boolean;
+  canPost: boolean;
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  groupName?: string; // Nếu có thì hiển thị tên group
 }
 
-export function CreatePostModal({ onClose, user }: CreatePostModalProps) {
-  const [postText, setPostText] = useState('');
-  const [selectedImages, setSelectedImages] = useState<string[]>([]);
-  const [isAnonymous, setIsAnonymous] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      const newImages = Array.from(files).map(file => URL.createObjectURL(file));
-      setSelectedImages(prev => [...prev, ...newImages]);
-    }
-  };
-
-  const removeImage = (index: number) => {
-    setSelectedImages(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handlePost = () => {
-    // Logic đăng bài
-    console.log({ postText, selectedImages, isAnonymous });
-    onClose();
-  };
-
+export function CreatePostModal({
+  onClose,
+  user,
+  postText,
+  setPostText,
+  selectedImages,
+  isAnonymous,
+  setIsAnonymous,
+  handleImageSelect,
+  removeImage,
+  handleCreatePost,
+  isCreating,
+  canPost,
+  fileInputRef,
+}: CreatePostModalProps) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-          <h2>Tạo bài viết</h2>
+          <h2 className="text-xl font-semibold">Tạo bài viết</h2>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+            disabled={isCreating}
+            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -58,9 +61,9 @@ export function CreatePostModal({ onClose, user }: CreatePostModalProps) {
             />
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <span>{user.name}</span>
+                <span className="font-semibold">{user.name}</span>
                 <button className="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded text-sm flex items-center gap-1 transition-colors">
-                  <span>Nhóm công khai</span>
+                  <span>{ 'Nhóm công khai'}</span>
                   <span>▼</span>
                 </button>
               </div>
@@ -72,9 +75,10 @@ export function CreatePostModal({ onClose, user }: CreatePostModalProps) {
             <span className="text-gray-700">Đăng ẩn danh</span>
             <button
               onClick={() => setIsAnonymous(!isAnonymous)}
+              disabled={isCreating}
               className={`w-12 h-6 rounded-full transition-colors relative ${
                 isAnonymous ? 'bg-blue-600' : 'bg-gray-300'
-              }`}
+              } ${isCreating ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div
                 className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform ${
@@ -88,8 +92,11 @@ export function CreatePostModal({ onClose, user }: CreatePostModalProps) {
           <textarea
             value={postText}
             onChange={(e) => setPostText(e.target.value)}
-            placeholder="Tạo bài viết công khai..."
+            placeholder={`Viết gì đó trong ...` 
+              
+            }
             className="w-full min-h-[120px] resize-none outline-none text-lg"
+            disabled={isCreating}
             autoFocus
           />
 
@@ -111,7 +118,8 @@ export function CreatePostModal({ onClose, user }: CreatePostModalProps) {
                     />
                     <button
                       onClick={() => removeImage(index)}
-                      className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                      disabled={isCreating}
+                      className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg disabled:opacity-50"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -124,7 +132,7 @@ export function CreatePostModal({ onClose, user }: CreatePostModalProps) {
           {/* Add to Post */}
           <div className="mt-4 border border-gray-300 rounded-lg p-3">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm">Thêm vào bài viết của bạn</span>
+              <span className="text-sm font-medium">Thêm vào bài viết của bạn</span>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -133,11 +141,13 @@ export function CreatePostModal({ onClose, user }: CreatePostModalProps) {
                 multiple
                 accept="image/*,video/*"
                 onChange={handleImageSelect}
+                disabled={isCreating}
                 className="hidden"
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                disabled={isCreating}
+                className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors disabled:opacity-50"
                 title="Ảnh/Video"
               >
                 <ImageIcon className="w-5 h-5 text-green-600" />
@@ -145,24 +155,28 @@ export function CreatePostModal({ onClose, user }: CreatePostModalProps) {
               <button
                 className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
                 title="Gắn thẻ người khác"
+                disabled={isCreating}
               >
                 <UsersIcon className="w-5 h-5 text-blue-600" />
               </button>
               <button
                 className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
                 title="Vị trí"
+                disabled={isCreating}
               >
                 <MapPin className="w-5 h-5 text-red-600" />
               </button>
               <button
                 className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
                 title="Cảm xúc"
+                disabled={isCreating}
               >
                 <Smile className="w-5 h-5 text-yellow-600" />
               </button>
               <button
                 className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
                 title="Thêm"
+                disabled={isCreating}
               >
                 <MoreHorizontal className="w-5 h-5 text-gray-600" />
               </button>
@@ -173,15 +187,16 @@ export function CreatePostModal({ onClose, user }: CreatePostModalProps) {
         {/* Footer */}
         <div className="p-4 border-t border-gray-200">
           <button
-            onClick={handlePost}
-            disabled={!postText.trim() && selectedImages.length === 0}
-            className={`w-full py-2.5 rounded-lg transition-colors ${
-              postText.trim() || selectedImages.length > 0
+            onClick={handleCreatePost}
+            disabled={!canPost}
+            className={`w-full py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold ${
+              canPost
                 ? 'bg-blue-600 hover:bg-blue-700 text-white'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
-            Đăng
+            {isCreating && <Loader2 className="w-5 h-5 animate-spin" />}
+            <span>{isCreating ? 'Đang đăng...' : 'Đăng'}</span>
           </button>
         </div>
       </div>

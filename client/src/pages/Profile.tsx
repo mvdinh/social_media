@@ -9,8 +9,7 @@ import getUrl  from "../utils/getUrl";
 import { useAuth1 } from "../context/Context";
 import { saveProfileToBlockchain } from "../helper/profileHelper";
 
-// IPFS client
-const ipfs = create({ host: "localhost", port: 5001, protocol: "http" });
+// IPFS client 
 
 export interface IProfileData {
   _id?: string;

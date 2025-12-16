@@ -1,16 +1,11 @@
 import { FileText, BarChart3, Smile } from 'lucide-react';
-import { CreatePostModal } from '../../Post/CreatePostModal';
-import { useAuth1 } from '../../../context/Context';
-import { useCreatePostGroup } from '../../../hooks/useCreatePostGroup';
-import { useParams } from 'react-router-dom';
+import { CreatePostModal } from './CreatePostModal';
+import { useAuth } from '../../context/AuthContext';
+import { useCreatePost } from '../../hooks/useCreatePost';
 
-
-
-export function CreateGroupPostBox() {
-  const { id } = useParams();
-  const { user, contracts } = useAuth1();
-  const address = user?.address;
-  const groupContract = contracts?.["group"];
+export function CreatePostBox() {
+  const { address, contracts } = useAuth();
+  const postContract = contracts?.["socialMedia"];
   
   const currentUser = {
     name: address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'User',
@@ -32,12 +27,12 @@ export function CreateGroupPostBox() {
     isCreating,
     canPost,
     fileInputRef
-  } = useCreatePostGroup({
-    contract: groupContract,
+  } = useCreatePost({
+    contract: postContract,
     address: address,
-    groupId: id, // Truyền groupId => Tạo post trong group
+    // Không truyền groupId => Tạo post bình thường
     onSuccess: () => {
-      console.log('Group post created successfully!');
+      console.log('Post created successfully!');
     }
   });
 
@@ -54,7 +49,7 @@ export function CreateGroupPostBox() {
             onClick={openModal}
             className="flex-1 bg-gray-100 hover:bg-gray-200 rounded-full px-4 py-2.5 text-left text-gray-500 transition-colors"
           >
-            Viết gì đó trong ...
+            Bạn viết gì đi...
           </button>
         </div>
 
