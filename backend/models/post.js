@@ -1,8 +1,6 @@
 import mongoose from "mongoose";
 
 const PostSchema = new mongoose.Schema({
-  // LIÊN KẾT VỚI MODEL USER
-  // Thay vì lưu string address, ta lưu _id của User để dùng .populate()
   owner: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: "User", 

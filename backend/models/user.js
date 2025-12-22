@@ -20,16 +20,12 @@ const UserSchema = new mongoose.Schema({
     select: false 
   },
 
-  // =====================
-  // PROFILE CƠ BẢN
-  // =====================
   username: { 
     type: String,
     default: function () { return this.address; },
     index: "text"
   },
 
-  // Avatar
   avatar: {
     type: String,
     default: function () {
@@ -38,22 +34,18 @@ const UserSchema = new mongoose.Schema({
       return `https://ui-avatars.com/api/?name=${letter}&background=0D8ABC&color=ffffff&size=256&bold=true`;
     }
   },
+
   avatarIpfsHash: { type: String, default: null },
 
-  // =====================
-  // ✅ CÁC TRƯỜNG MỚI THÊM
-  // =====================
-  
-  // 1. Ảnh bìa (Cover Image)
-  coverImage: { type: String, default: "" }, 
-  coverImageIpfsHash: { type: String, default: null }, // Lưu hash IPFS của ảnh bìa
+  coverImage: { type: String, default: "" },
 
-  // 2. Thông tin cá nhân chi tiết
+  coverImageIpfsHash: { type: String, default: null }, 
+
   bio: { type: String, default: "" },
   
-  dob: { type: Date, default: null }, // Ngày sinh
+  dob: { type: Date, default: null }, 
   
-  hometown: { type: String, default: "" }, // Quê quán
+  hometown: { type: String, default: "" }, 
   
   relationshipStatus: { 
     type: String, 
@@ -61,10 +53,8 @@ const UserSchema = new mongoose.Schema({
     default: "" 
   },
 
-  // =====================
-  // SOCIAL GRAPH
-  // =====================
   followers: [{ type: String, lowercase: true }],
+
   following: [{ type: String, lowercase: true }],
 
   createdAt: { type: Date, default: Date.now }

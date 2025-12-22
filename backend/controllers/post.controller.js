@@ -6,9 +6,6 @@ import { uploadFileToIPFS, getIPFSMetadata } from "../services/ipfs.service.js";
 import { IPFS_CONFIG } from "../config/ipfs.js";
 import fs from "fs";
 
-// ==========================================
-// 1. CREATE POST
-// ==========================================
 export const createPost = async (req, res) => {
   try {
     const isFormData = !!req.files;
@@ -65,26 +62,10 @@ export const createPost = async (req, res) => {
 
     await newPost.populate("owner", "address username avatar");
 
-    // =========================
-    // FORMAT RESPONSE
-    // =========================
-    const formattedPost = {
-      ...newPost.toObject(),
-      mediaUrls: mediaCids.map(cid => `${IPFS_CONFIG.GATEWAY_URL}/${cid}`),
-      owner: {
-        ...newPost.owner.toObject(),
-        avatar: newPost.owner.avatar?.startsWith("http")
-          ? newPost.owner.avatar
-          : newPost.owner.avatar
-            ? `${IPFS_CONFIG.GATEWAY_URL}/${newPost.owner.avatar}`
-            : `https://api.dicebear.com/7.x/avataaars/svg?seed=${newPost.owner._id}`
-      },
-      isLikedByCurrentUser: false
-    };
-
+    
     return res.json({
       success: true,
-      post: formattedPost
+      post: newPost
     });
 
   } catch (err) {
@@ -97,6 +78,7 @@ export const createPost = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
 
 // ==========================================
 // 2. GET POSTS
@@ -118,44 +100,37 @@ export const getPosts = async (req, res) => {
 
     const formattedPosts = await Promise.all(
       posts.map(async (post) => {
-        const processedMediaUrls = await Promise.all(
-          (post.mediaUrls || []).map(async (cid) => {
-            try {
-              await getIPFSMetadata(cid);
-              return `${IPFS_CONFIG.GATEWAY_URL}/${cid}`;
-            } catch {
-              return `${IPFS_CONFIG.GATEWAY_URL}/${cid}`;
-            }
-          })
+
+        const processedMediaUrls = (post.mediaUrls || []).map(
+          cid => `${IPFS_CONFIG.GATEWAY_URL}/${cid}`
         );
 
-        let ownerAvatar;
-        if (post.owner?.avatar) {
-          try {
-            await getIPFSMetadata(post.owner.avatar);
-            ownerAvatar = `${IPFS_CONFIG.GATEWAY_URL}/${post.owner.avatar}`;
-          } catch {
-            ownerAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.owner._id}`;
-          }
-        } else {
-          ownerAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.owner?._id || "default"}`;
+        let ownerAvatar = post.owner?.avatar || null;
+
+        if (post.owner?.avatarIpfsHash) {
+          ownerAvatar = `${IPFS_CONFIG.GATEWAY_URL}/${post.owner.avatarIpfsHash}`;
         }
 
+        // ===== LIKE STATUS =====
         const isLikedByCurrentUser = currentUserAddress
           ? post.likes.some(addr => addr === currentUserAddress)
           : false;
 
         return {
-          ...post,
-          mediaUrls: processedMediaUrls,
-          owner: {
-            ...post.owner,
-            avatar: ownerAvatar
-          },
-          isLikedByCurrentUser
-        };
-      })
-    );
+        ...post,
+        mediaUrls: processedMediaUrls,
+        owner: {
+          ...post.owner,
+          ...(post.owner?.avatarIpfsHash
+            ? { avatarIpfsHash: post.owner.avatarIpfsHash }
+            : { avatar: post.owner?.avatar }
+          )
+        },
+        isLikedByCurrentUser
+      };
+    })
+);
+
 
     res.json(formattedPosts);
 
@@ -335,6 +310,62 @@ export const getComments = async (req, res) => {
 
   } catch (err) {
     console.error("Get comments error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const getPostsByUser = async (req, res) => {
+  try {
+     const { userId } = req.params;
+    const currentUserAddress = req.user?.address;
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const posts = await Post.find({
+      owner: userId,
+      isDeleted: false
+    })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate("owner", "address username avatar avatarIpfsHash")
+      .lean();
+
+    const formattedPosts = await Promise.all(
+      posts.map(async (post) => {
+
+        const processedMediaUrls = (post.mediaUrls || []).map(
+          cid => `${IPFS_CONFIG.GATEWAY_URL}/${cid}`
+        );
+
+        let ownerAvatar = post.owner?.avatar || null;
+
+        if (post.owner?.avatarIpfsHash) {
+          ownerAvatar = `${IPFS_CONFIG.GATEWAY_URL}/${post.owner.avatarIpfsHash}`;
+        }
+
+        // ===== LIKE STATUS =====
+        const isLikedByCurrentUser = currentUserAddress
+          ? post.likes.some(addr => addr === currentUserAddress)
+          : false;
+
+        return {
+        ...post,
+        mediaUrls: processedMediaUrls,
+        owner: {
+          ...post.owner,
+          avatar: ownerAvatar
+        },
+        isLikedByCurrentUser
+      };
+    })
+);
+    res.json(formattedPosts);
+
+  } catch (err) {
+    console.error("Get posts error:", err);
     res.status(500).json({ error: err.message });
   }
 };

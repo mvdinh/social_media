@@ -6,16 +6,12 @@ import {
   toggleLike, 
   getPosts, 
   addComment,
-  getComments
+  getComments,
+  getPostsByUser
 } from "../controllers/post.controller.js";
 
 const router = express.Router();
 
-// ==========================================
-// TẤT CẢ ROUTES DƯỚI ĐÂY ĐỀU CẦN LOGIN (Token)
-// ==========================================
-
-// 1. Xem danh sách bài viết (Feed)
 router.get("/", verifyToken, getPosts); 
 
 // 2. Xem bình luận của một bài viết
@@ -35,5 +31,7 @@ router.post("/:postId/like", verifyToken, toggleLike);
 
 // 5. Bình luận
 router.post("/:postId/comment", verifyToken, addComment);
+
+router.get("/:id", verifyToken, getPostsByUser);
 
 export default router;

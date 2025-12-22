@@ -8,7 +8,7 @@ const Login = () => {
   const { login, isAuthenticated, isLoading } = useAuth1();
   const navigate = useNavigate();
 
-  // Nếu đã login rồi thì đá sang Feed luôn (tránh user F5 lại trang login)
+  
   useEffect(() => {
     if (isAuthenticated) {
       navigate("/feed");
@@ -17,11 +17,9 @@ const Login = () => {
 
   const handleLoginClick = async () => {
     try {
-      await login(); // Gọi hàm login từ Context
-      // Nếu không có lỗi ném ra, login thành công -> useEffect ở trên sẽ tự chuyển trang
+      await login(); 
     } catch (error) {
-      // Lỗi đã được xử lý hiển thị Toast bên trong AuthContext
-      // Ở đây chỉ cần catch để app không crash
+      
     }
   };
 

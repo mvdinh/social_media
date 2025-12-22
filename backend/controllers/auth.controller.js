@@ -36,17 +36,26 @@ export const getNonce = async (req, res) => {
   }
 };
 
-// 2. LOGIN (Cập nhật: Trả về cả 2 token)
 export const login = async (req, res) => {
   try {
     const { address, signature } = req.body;
-    if (!address || !signature) return res.status(400).json({ error: "Missing fields" });
-
+    if (!address || !signature) {
+      return res.status(400).json({ error: "Missing fields" });
+    }
+    console.log("add:", address);
+    console.log("sig: ", signature);
     const normalizedAddress = address.toLowerCase();
-    const user = await User.findOne({ address: normalizedAddress });
-    if (!user) return res.status(404).json({ error: "User not found" });
 
-    // Verify Signature
+    let user = await User.findOne({ address: normalizedAddress });
+
+    if (!user) {
+      user = await User.create({
+        address: normalizedAddress,
+        nonce: getNonce(),
+      });
+    }
+
+    // 🔐 Verify Signature
     const message = `Nonce: ${user.nonce}`;
     const recoveredAddress = ethers.verifyMessage(message, signature);
 
@@ -54,28 +63,24 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: "Invalid Signature" });
     }
 
-    // ✅ TẠO 2 TOKEN
+    // 🎟️ TẠO TOKEN
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    // Lưu Refresh Token vào DB để quản lý
+    // 💾 Lưu refresh token + đổi nonce
     user.refreshToken = refreshToken;
-    
-    // Đổi Nonce
     user.nonce = Math.floor(Math.random() * 1000000).toString();
-    
     await user.save();
 
     res.json({
       success: true,
       accessToken,
-      refreshToken, // Frontend cần lưu cái này
-      user: { 
-        id: user._id, 
+      refreshToken,
+      user: {
+        id: user._id,
         address: user.address,
-        avatar : user.avatar,
-        avatarIpfsHash: user.avatarIpfsHash,
-        username: user.username
+        username: user.username,
+        avatar: user.avatar,
       }
     });
 
@@ -84,6 +89,7 @@ export const login = async (req, res) => {
     res.status(500).json({ error: "Login Failed" });
   }
 };
+
 
 // 3. REFRESH TOKEN (API Mới)
 // Client gọi API này khi Access Token hết hạn

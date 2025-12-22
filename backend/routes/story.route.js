@@ -13,11 +13,6 @@ import {
 
 const router = express.Router();
 
-// ==========================================
-// 📖 STORY ROUTES
-// ==========================================
-
-// 1. Xem danh sách Story (Public - Ai cũng xem được)
 router.get("/", getStories);
 
 // 2. Tạo Story (Private - Cần Token)

@@ -17,6 +17,7 @@ import getUrl from "../utils/getUrl";
 // ✅ Nhận unreadCount từ props
 const Navbar = ({ onMessageClick, onNotification, onUser, unreadCount = 0 }) => {
   const { user } = useAuth1();
+  const id = user?.id;
   const location = useLocation();
   const pathname = location.pathname;
 
@@ -61,7 +62,7 @@ const Navbar = ({ onMessageClick, onNotification, onUser, unreadCount = 0 }) => 
             </Link>
 
             <Link to="/friends/requests" className="flex items-center justify-center relative group px-4">
-              <Users className={isActive("/friends") ? activeIconClass : iconClass} />
+              <Users className={isActive("/friends/requests") ? activeIconClass : iconClass} />
                <div className={`absolute bottom-0 w-full h-1 rounded-t-sm transition duration-150 ${isActive("/friends") ? "bg-blue-600" : "bg-transparent group-hover:bg-gray-200"}`}></div>
             </Link>
 
@@ -75,10 +76,13 @@ const Navbar = ({ onMessageClick, onNotification, onUser, unreadCount = 0 }) => 
                <div className={`absolute bottom-0 w-full h-1 rounded-t-sm transition duration-150 ${isActive("/store") ? "bg-blue-600" : "bg-transparent group-hover:bg-gray-200"}`}></div>
             </Link>
             
-             <Link to="/profile" className="flex items-center justify-center relative group px-4">
-              <User className={isActive("/profile") ? activeIconClass : iconClass} />
-               <div className={`absolute bottom-0 w-full h-1 rounded-t-sm transition duration-150 ${isActive("/profile") ? "bg-blue-600" : "bg-transparent group-hover:bg-gray-200"}`}></div>
-            </Link>
+            {user && (
+              <Link to={`/profile/${id}`} className="flex items-center justify-center relative group px-4">
+                <User className={isActive(`/profile/${id}`) ? activeIconClass : iconClass} />
+                <div className={`absolute bottom-0 w-full h-1 rounded-t-sm transition duration-150 ${isActive(`/profile/${id}`) ? "bg-blue-600" : "bg-transparent group-hover:bg-gray-200"}`}></div>
+              </Link>
+            )}
+
           </div>
         </div>
 
@@ -106,7 +110,7 @@ const Navbar = ({ onMessageClick, onNotification, onUser, unreadCount = 0 }) => 
 
           <div className="h-10 w-10 cursor-pointer ml-1">
             <img
-              src={user?.avatarIpfsHash ? getUrl(user.avatarIpfsHash) : user?.avatar || "https://via.placeholder.com/40"}
+              src={user?.avatar}
               className="h-full w-full rounded-full object-cover border border-gray-200"
               onClick={onUser}
               alt="avatar"

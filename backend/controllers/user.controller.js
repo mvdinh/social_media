@@ -1,18 +1,14 @@
 import User from "../models/user.js";
 import { ethers } from "ethers";
 
-// ==========================================
-// 1. GET USER BY ID
-// ==========================================
 export const getUserById = async (req, res) => {
   try {
-    const id = req.userId;
+    const {id} = req.params;
     
     // Tìm user theo _id hoặc address
     const user = await User.findOne({ 
       $or: [
-        { _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null }, 
-        { address: id.toLowerCase() }
+        { _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null }
       ]
     });
 
@@ -22,18 +18,7 @@ export const getUserById = async (req, res) => {
 
     res.json({
   success: true,
-  user: {
-    _id: user._id,
-    address: user.address,
-    username: user.username,
-    bio: user.bio,
-    local: user.hometown,
-    birthDate: user.dob,
-    relationshipStatus: user.relationshipStatus,
-    avatar: user.avatarIpfsHash, 
-    coverPhotoUrl: user.coverImageIpfsHash,
-    email: user.email 
-  }
+  user:user
 });
 
   } catch (error) {
@@ -42,13 +27,10 @@ export const getUserById = async (req, res) => {
   }
 };
 
-// ==========================================
-// 2. UPDATE PROFILE (SỬA ĐỔI ĐỂ GIỮ NGUYÊN GIÁ TRỊ CŨ)
-// ==========================================
+
 export const updateProfile = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const userAddress = req.user.address;
+    const {id} = req.params;
 
     // Lấy dữ liệu từ body
     const { 
@@ -56,11 +38,6 @@ export const updateProfile = async (req, res) => {
       avatarCid, coverCid, metadataCid,
       signature, message
     } = req.body;
-
-    // --- 1. XÁC THỰC CHỮ KÝ ---
-    if (!signature || !message) {
-      return res.status(400).json({ error: "Yêu cầu chữ ký ví để xác thực." });
-    }
 
     const recoveredAddress = ethers.verifyMessage(message, signature);
     if (recoveredAddress.toLowerCase() !== userAddress.toLowerCase()) {

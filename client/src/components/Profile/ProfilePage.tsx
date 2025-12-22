@@ -36,9 +36,6 @@ interface IUpdatedData {
   coverPhotoUrl?: string;
 }
 
-// Cấu hình Modal root
-Modal.setAppElement("#root");
-
 const ProfilePage: React.FC = () => {
   const { user } = useAuth1();
   const [profileData, setProfileData] = useState<IProfileData | null>(null);
@@ -87,10 +84,16 @@ const ProfilePage: React.FC = () => {
       console.log("Click change avatar");
   };
 
-  const handleCoverClick = () => {
-      // Logic upload cover
-      console.log("Click change cover");
-  }
+  const handleCoverClick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        // Gọi API upload ảnh cover ở đây
+        // const formData = new FormData();
+        // formData.append('cover', file);
+        // ...
+        console.log("File cover selected:", file);
+    }
+}
 
   // ===== LOADING =====
   if (loading) {
